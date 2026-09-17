@@ -1,0 +1,301 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+  PT Manager — dark studio workspace
+  Lo schermo è un ambiente di lavoro scuro e tattile; la stampa resta un
+  foglio A4 leggibile. Il vetro è riservato al chrome, non ai dati.
+   ========================================================================== */
+
+@theme {
+  /* --- Colore ---------------------------------------------------------- */
+  --color-paper: #0b0d0e; /* canvas dell'app */
+  --color-surface: #15191b; /* superfici dati solide */
+  --color-ink: #f5f1eb; /* testo caldo, leggibile sul nero */
+  --color-muted: #a7aca9; /* testo secondario */
+  --color-line: #303638; /* filetti discreti */
+  --color-line-strong: #59615f; /* filetti di sezione */
+
+  --color-accent: #ff6b1a; /* signal orange: azioni e brand */
+  --color-accent-hover: #ff8a3d;
+  --color-teal: #ff8a3d; /* alias semantico per gli stati attivi */
+  --color-teal-soft: #3a2115;
+  --color-focus: #ff8a3d;
+
+  --color-glass: rgb(21 25 27 / 0.78);
+  --color-glass-border: rgb(255 255 255 / 0.12);
+  --shadow-dialog: 0 24px 64px rgb(0 0 0 / 0.52);
+  --motion-fast: 100ms;
+  --motion-standard: 180ms;
+
+  --color-scaduta: #ff796f; /* scheda scaduta */
+  --color-scaduta-soft: #321b1b;
+  --color-scadenza: #f2b84b; /* scheda in scadenza */
+  --color-scadenza-soft: #332914;
+
+  /* --- Tipografia ------------------------------------------------------ */
+  /* Una sola famiglia. È l'asse di larghezza (wdth 75–125) a fare il lavoro
+     espressivo: i titoli girano Expanded, il testo resta a larghezza normale. */
+  --font-sans:
+    "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* Scala modulare, base 15px, ratio ~1.25 */
+  --text-xs: 0.75rem; /* 12 */
+  --text-xs--line-height: 1.35;
+  --text-sm: 0.8125rem; /* 13 */
+  --text-sm--line-height: 1.45;
+  --text-base: 0.9375rem; /* 15 */
+  --text-base--line-height: 1.55;
+  --text-lg: 1.0625rem; /* 17 */
+  --text-lg--line-height: 1.45;
+  --text-xl: 1.3125rem; /* 21 */
+  --text-xl--line-height: 1.3;
+  --text-2xl: 1.6875rem; /* 27 */
+  --text-2xl--line-height: 1.2;
+  --text-3xl: 2.125rem; /* 34 */
+  --text-3xl--line-height: 1.12;
+  --text-4xl: 2.6875rem; /* 43 */
+  --text-4xl--line-height: 1.05;
+
+  /* --- Forma ----------------------------------------------------------- */
+  --radius-control: 10px;
+
+  --spacing-sidebar: 232px;
+  --spacing-column: 1040px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.55;
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Le cifre non devono mai ballare: sets, reps, recuperi e date stanno in
+     colonna e vengono confrontate a colpo d'occhio. */
+  body,
+  input,
+  select,
+  textarea,
+  button,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  p,
+  li {
+    text-wrap: pretty;
+  }
+
+  /* Lunghezza di riga: sotto gli 80 caratteri, sempre. */
+  .prose-column {
+    max-width: 64ch;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: #0b0d0e;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  /* Il movimento risponde a un'azione (trascinare, aprire). Mai decorativo. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --color-glass: #15191b;
+      --color-glass-border: #59615f;
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    :root {
+      --color-muted: #d0d4d1;
+      --color-line: #68716e;
+      --color-line-strong: #a7aca9;
+      --color-focus: #ffb07a;
+    }
+  }
+}
+
+@utility material-chrome {
+  background-color: var(--color-glass);
+  backdrop-filter: blur(18px) saturate(125%);
+  border-color: var(--color-glass-border);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility dialog-surface {
+  box-shadow: var(--shadow-dialog);
+  transform-origin: center;
+}
+
+@utility print-surface {
+  --color-paper: #ffffff;
+  --color-surface: #ffffff;
+  --color-ink: #000000;
+  --color-muted: #4a5551;
+  --color-line: #9aa5a1;
+  --color-line-strong: #6f7c77;
+}
+
+dialog[open].dialog-surface {
+  animation: dialog-in var(--motion-standard) ease-out both;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .material-chrome {
+    background-color: var(--color-surface);
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog[open].dialog-surface {
+    animation: none;
+  }
+}
+
+/* --- Utility di tipografia ------------------------------------------------
+   `display` è il trattamento espressivo: Archivo allargato con crenatura
+   stretta. Serve solo su nomi cliente, titoli scheda e titoli pagina. */
+
+@utility display {
+  font-stretch: 118%;
+  font-weight: 650;
+  letter-spacing: -0.022em;
+}
+
+@utility display-tight {
+  font-stretch: 112%;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+}
+
+@utility nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Stampa ---------------------------------------------------------------
+   PRD §3.4: l'export è la stampa nativa del browser su questa pagina. */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+
+  /* I filetti tarati per uno schermo retroilluminato spariscono col toner, e
+     il grigio del testo secondario diventa illeggibile. Si ritarano i *token*,
+     non i bordi uno per uno: così la gerarchia regge — il filetto pesante di
+     un giorno resta più scuro della riga di un esercizio, che è tutto quello
+     che tiene insieme il foglio. */
+  :root {
+    --color-paper: #ffffff;
+    --color-surface: #ffffff;
+    --color-line: #9aa5a1;
+    --color-line-strong: #6f7c77;
+    --color-muted: #4a5551;
+    --color-ink: #000000;
+    --color-accent: #000000;
+    --color-accent-hover: #000000;
+    --color-teal: #000000;
+    --color-teal-soft: #eeeeee;
+    --color-focus: #000000;
+  }
+
+  html,
+  body {
+    background: #fff;
+    font-size: 10.5pt;
+  }
+
+  /* Niente navigazione, niente azioni: resta solo il foglio. */
+  .no-print,
+  nav[data-app-nav],
+  [data-offline-banner] {
+    display: none !important;
+  }
+
+  /* I margini li dà @page: il foglio occupa tutto quello che resta. */
+  .print-sheet {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Un giorno di allenamento non si spezza a metà pagina. */
+  [data-print-day] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  [data-print-row] {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+
+  img {
+    max-width: 100%;
+  }
+}

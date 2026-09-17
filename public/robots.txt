@@ -1,0 +1,3 @@
+# Gestionale privato: niente da indicizzare.
+User-agent: *
+Disallow: /

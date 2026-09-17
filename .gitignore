@@ -1,0 +1,21 @@
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# Segreti: la anon key è pubblica, la service_role key NO. Nessun .env va committato.
+.env
+.env.*
+!.env.example
+
+# Dataset esercizi scaricato per il seed (grande, non versionarlo)
+supabase/seed/data/
+
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.idea/
+.vscode/*
+!.vscode/extensions.json
