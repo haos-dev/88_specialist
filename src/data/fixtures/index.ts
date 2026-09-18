@@ -622,6 +622,17 @@ const impostazioniFixtures: ImpostazioniApi = {
     impostazioni = { ...impostazioni, ...input };
     return attesa({ ...impostazioni });
   },
+  async rigeneraTokenCalendario() {
+    // Token finto ma dalla stessa forma di encode(gen_random_bytes(24),'hex'):
+    // 48 caratteri esadecimali, così l'URL mostrato in UI è realistico anche
+    // sui dati di esempio.
+    const nuovoToken = Array.from({ length: 48 }, () =>
+      Math.floor(Math.random() * 16).toString(16),
+    ).join("");
+    impostazioni = { ...impostazioni, calendar_feed_token: nuovoToken };
+    await attesa(null, 200);
+    return nuovoToken;
+  },
 };
 
 const dashboardFixtures: DashboardApi = {

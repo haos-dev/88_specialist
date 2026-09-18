@@ -34,3 +34,17 @@ export function useSalvaImpostazioni() {
     },
   })
 }
+
+export function useRigeneraTokenCalendario() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => dati.impostazioni.rigeneraTokenCalendario(),
+    onSuccess: (nuovoToken) => {
+      client.setQueryData(
+        chiavi.impostazioni,
+        (precedenti: Awaited<ReturnType<typeof dati.impostazioni.leggi>> | undefined) =>
+          precedenti && { ...precedenti, calendar_feed_token: nuovoToken },
+      )
+    },
+  })
+}

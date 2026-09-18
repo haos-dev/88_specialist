@@ -90,6 +90,7 @@ export type TrainerSettingsRow = {
   phone: string | null;
   email: string | null;
   reminder_days_before: number | null;
+  calendar_feed_token: string | null;
 };
 
 export type AppointmentRow = {
@@ -202,6 +203,11 @@ export type Database = {
       riordina_esercizi: {
         Args: { p_day_id: string; p_ids: string[]; p_posizioni: number[] };
         Returns: undefined;
+      };
+      /** Rigenera il token del feed calendario del trainer autenticato (0006). */
+      rigenera_token_calendario: {
+        Args: Record<string, never>;
+        Returns: string;
       };
     };
     Enums: { plan_status: PlanStatus };

@@ -134,6 +134,8 @@ export type ImpostazioniInput = Omit<Impostazioni, "owner_id">;
 export interface ImpostazioniApi {
   leggi(): Promise<Impostazioni>;
   salva(input: ImpostazioniInput): Promise<Impostazioni>;
+  /** Genera un nuovo token per il feed calendario, invalidando quello precedente. */
+  rigeneraTokenCalendario(): Promise<string>;
 }
 
 /* ------------------------------------------------------------------ tutto */

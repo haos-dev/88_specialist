@@ -111,22 +111,32 @@ tests/                      planExpiry  renewPlan  reorder  dates  filename
 
 ## 3. Schema database
 
-Sei tabelle: `clients`, `exercises`, `workout_plans`, `workout_days`, `workout_day_exercises`,
-`trainer_settings`. Tutte con RLS attiva; tutte filtrate per `owner_id` tranne `exercises`, che è
-la libreria condivisa e ha una policy "tutto agli autenticati, niente agli anonimi".
+Otto tabelle: `clients`, `exercises`, `workout_plans`, `workout_days`, `workout_day_exercises`,
+`trainer_settings`, **`appointments`** *(§3.7, aggiunta senza passare da questo file — vedi nota
+sotto)*. Tutte con RLS attiva; tutte filtrate per `owner_id` tranne `exercises`, che è la
+libreria condivisa e ha una policy "tutto agli autenticati, niente agli anonimi".
 
 **Fonte di verità: `supabase/migrations/`.** PRD §7 è stato aggiornato per corrispondervi.
 Nessuna migrazione è stata ancora applicata: non esiste un database.
 
-Le migrazioni contengono anche tre funzioni Postgres chiamate dall'app via `rpc()`:
+> **Nota di processo (colmata ora)**: la tabella `appointments` (0005) e il componente
+> `AppointmentCalendar.tsx` in Dashboard erano stati costruiti senza aggiornare né questo file
+> né il PRD — li ho trovati scollati durante una revisione e li ho appena riallineati (PRD §3.7,
+> qui sotto). Se in futuro capita di nuovo con qualcos'altro: è proprio il segnale che questo
+> file dovrebbe intercettare, quindi vale la pena controllare periodicamente `git diff` dello
+> schema/dei componenti contro quello che questo file dichiara.
+
+Le migrazioni contengono anche funzioni Postgres chiamate dall'app via `rpc()`:
 
 | Funzione | Perché esiste |
 |---|---|
 | `rinnova_scheda(plan_id, titolo, inizio, fine)` | Copia scheda + giorni + esercizi in **una** transazione. Dal client sarebbero 3+ round-trip: un errore a metà lascerebbe una scheda senza esercizi. |
 | `riordina_giorni(plan_id, ids[], posizioni[])` | Un solo UPDATE dopo un drag&drop, invece di N. |
 | `riordina_esercizi(day_id, ids[], posizioni[])` | Idem, e il vincolo su `day_id` rende impossibile spostare un esercizio in un altro giorno (PRD §3.3). |
+| `rigenera_token_calendario()` | Ruota `trainer_settings.calendar_feed_token` (PRD §3.7); gestisce anche il caso "la riga non esiste ancora" come A7. |
 
-Tutte `security invoker`: le policy RLS continuano ad applicarsi.
+Tutte `security invoker` più `revoke`/`grant` espliciti (solo `authenticated`): le policy RLS
+continuano ad applicarsi e nessuna è chiamabile da `anon`.
 
 ---
 
@@ -145,7 +155,8 @@ backend.
 | schede | `elencoPerCliente` `inScadenza` `dettaglio` `crea` `aggiorna` `impostaStato` `elimina` `rinnova` | `data/supabase/schede.ts` |
 | schede → giorni | `aggiungiGiorno` `rinominaGiorno` `eliminaGiorno` `riordinaGiorni` | idem |
 | schede → esercizi | `aggiungiEsercizio` `aggiornaEsercizio` `rimuoviEsercizio` `riordinaEsercizi` | idem |
-| impostazioni | `leggi` `salva` | `data/supabase/impostazioni.ts` |
+| impostazioni | `leggi` `salva` `rigeneraTokenCalendario` | `data/supabase/impostazioni.ts` |
+| appuntamenti | `elenco`(per mese) `crea` `elimina` | `data/supabase/appuntamenti.ts` |
 
 Due dettagli di PostgREST che valgono la pena di ricordare, perché sono facili da sbagliare:
 
@@ -164,7 +175,8 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
 - **Accesso** — qualunque email e una password di almeno 4 caratteri. Guardia di rotta, ritorno
   alla pagina che si stava aprendo, avviso su come recuperare la password.
 - **Dashboard** — schede da rinnovare, ordinate dalla più scaduta alla più imminente, con badge
-  che dice "scaduta da 3 giorni" / "scade tra 5 giorni".
+  che dice "scaduta da 3 giorni" / "scade tra 5 giorni"; **calendario mensile appuntamenti**
+  (crea/elimina, cliente opzionale, navigazione tra i mesi).
 - **Clienti** — elenco con ricerca live e filtro attivi/archiviati/tutti, creazione, modifica,
   archiviazione, riattivazione, eliminazione definitiva (solo se archiviato, con conferma).
 - **Dettaglio cliente** — anagrafica, note, elenco delle sue schede con stato e scadenza.
@@ -175,12 +187,22 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
   rinnova, archivia, elimina.
 - **Stampa** — anteprima in una scheda nuova, immagini attese prima di stampare, nome file
   proposto `Scheda - Mario Rossi - Ipertrofia — blocco 1`.
-- **Impostazioni** — intestazione, recapiti, soglia di preavviso, con anteprima del logo.
+- **Impostazioni** — intestazione, recapiti, soglia di preavviso, anteprima del logo, **link del
+  feed calendario con copia/rigenerazione**.
+- **Feed calendario (.ics)** — `supabase/functions/calendar-feed`: dato un token valido,
+  restituisce gli appuntamenti (±1 anno da oggi) in formato iCalendar, pronto per
+  "iscriviti a calendario da URL" su Apple/Google/Outlook Calendar. A senso unico, non richiede
+  login (il token è l'autenticazione). Non ancora deployata (va fatto insieme al resto in §9).
 - **Offline** — avviso persistente, e messaggi che dicono cosa non è stato salvato.
 
 Qualità: `npx tsc -b` pulito · `npx eslint .` 0 errori (2 warning `react-refresh`, innocui:
 `AuthProvider` e `Toast` esportano un hook accanto al componente) · `npx vitest run` **67 test
 verdi** · `npm run build` produce `dist/` con manifest e service worker.
+
+⚠️ Nessun test automatico copre ancora la logica del feed calendario (escaping ICS, calcolo
+DTSTART/DTEND, piegatura righe): vive in una Edge Function Deno con import `npm:`, fuori dalla
+portata diretta di Vitest così com'è configurato oggi. Da valutare se vale la pena estrarre le
+funzioni pure di formattazione in un modulo testabile separatamente, prima o durante il wiring.
 
 ---
 
@@ -195,6 +217,8 @@ verdi** · `npm run build` produce `dist/` con manifest e service worker.
 - [x] Fase 7 — Export PDF (anteprima HTML + stampa nativa)
 - [x] Fase 8 — Impostazioni e branding
 - [x] Fase 9 — PWA (manifest, service worker, icone)
+- [x] Fase 9bis — Calendario appuntamenti + feed iCalendar *(non pianificata in origine, vedi
+      nota §3; documentata ora, migrazione 0005+0006 non ancora applicata)*
 - [ ] Fase 10 — **Deploy e wiring** → §9
 
 ---
@@ -263,6 +287,30 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
   migrazioni. Appena il progetto Supabase esiste, va **rigenerato** (comando in §9) — è quello
   che rende reale la sicurezza di tipo su ogni query.
 
+### Fase 9bis — Calendario appuntamenti + feed iCalendar (completata)
+
+- **Trovato**: tabella `appointments` (0005) e componente `AppointmentCalendar.tsx` già
+  presenti in Dashboard, costruiti senza passare da PRD/STATO — colmato il disallineamento
+  aggiornando entrambi (PRD §3.7/§4/§7, questo file §3/§5/§6).
+- **Aggiunto**: migrazione `0006_calendar_feed.sql` (colonna `trainer_settings.calendar_feed_token`
+  + funzione `rigenera_token_calendario()`, `security invoker`, `revoke`/`grant` come le altre
+  funzioni di `0004`); Edge Function `supabase/functions/calendar-feed` che genera un feed
+  `.ics` filtrato per owner tramite il token (±1 anno da oggi, RFC 5545: escaping, piegatura
+  righe, `DTSTART`/`DTEND` in `TZID=Europe/Rome`); UI in Impostazioni per generare/copiare/
+  rigenerare il link, con conferma prima di rigenerare (invalida le iscrizioni esistenti).
+- **File toccati**: `supabase/migrations/0006_calendar_feed.sql` (nuovo),
+  `supabase/functions/calendar-feed/index.ts` (nuovo), `src/types/database.ts`
+  (`calendar_feed_token`, tipo della funzione rpc), `src/data/types.ts` (`ImpostazioniApi`),
+  `src/data/supabase/impostazioni.ts`, `src/data/fixtures/{index,dati}.ts`,
+  `src/features/settings/useSettings.ts` (`useRigeneraTokenCalendario`), `src/pages/Settings.tsx`.
+- **Verificato**: `npx tsc -b`, `npx eslint .`, `npx vitest run` (67 test, invariati) e
+  `npm run build` tutti puliti dopo le modifiche.
+- **Non fatto**: nessun test automatico sulla logica del feed (vive in Deno, fuori dalla portata
+  diretta di Vitest così com'è configurato — vedi avviso in §5); deploy della function (§9.6bis,
+  richiede un progetto Supabase reale, non ancora creato).
+- **A senso unico per scelta**: quanto inserito nell'app compare sul calendario del telefono, non
+  il contrario. Un sync bidirezionale vorrebbe dire CalDAV, esplicitamente fuori scope (PRD §4).
+
 ---
 
 ## 9. Da fare da te (wiring)
@@ -294,6 +342,8 @@ supabase/migrations/0001_schema.sql
 supabase/migrations/0002_rls.sql
 supabase/migrations/0003_triggers_indexes.sql
 supabase/migrations/0004_functions.sql
+supabase/migrations/0005_appointments.sql
+supabase/migrations/0006_calendar_feed.sql
 ```
 
 Con la CLI: `npx supabase link --project-ref <ref>` e poi `npx supabase db push`.
@@ -346,6 +396,23 @@ npx supabase gen types typescript --project-id <ref> > src/types/database.ts
 Poi `npx tsc -b`: se compila, ogni query dell'app corrisponde davvero alle colonne che esistono.
 Se non compila, TypeScript ti sta indicando esattamente dove il codice e il database divergono —
 è per questo che il progetto è in TypeScript.
+
+### 9.6bis Deploy della Edge Function (feed calendario)
+
+`supabase/functions/calendar-feed` non fa parte del build della webapp: va deployata a parte.
+
+```bash
+npx supabase functions deploy calendar-feed --project-ref <ref>
+```
+
+Non servono secret aggiuntivi: `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` sono già disponibili
+di default in ogni Edge Function. Dopo il deploy, in **Impostazioni** dell'app compare il
+pulsante per generare/copiare l'URL del feed (richiede `VITE_SUPABASE_URL` già impostata al
+punto 9.1).
+
+Verifica rapida: apri l'URL copiato in un browser, deve scaricare/mostrare un file `.ics` con
+`BEGIN:VCALENDAR`. Se dà 404, il token non corrisponde a nessuna riga di `trainer_settings`
+(probabile: la 0006 non è stata applicata, o l'account non ha ancora rigenerato un token).
 
 ### 9.7 Test contro un database vero (opzionale)
 

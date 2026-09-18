@@ -118,13 +118,35 @@ sono costruite sotto, non cosa fanno per il trainer.)*
   `end_date` escluse dal calcolo.
 - Nessuna notifica nativa del sistema operativo — solo in-app.
 
+### 3.7 Calendario Appuntamenti
+> Implementata in sviluppo senza passare da questo documento — sezione aggiunta a posteriori
+> per allinearlo al codice reale (tabella `appointments`, componente
+> `AppointmentCalendar.tsx`), non il contrario.
+
+- Widget calendario mensile in Dashboard: crea/elimina appuntamenti (titolo, data, orario,
+  durata, cliente opzionale, note), navigazione tra i mesi.
+- Indipendente dalle Schede di allenamento: un appuntamento è un impegno puntuale (data+ora),
+  non ha una `status` né entra nel reminder di scadenza.
+- **Feed iCalendar (.ics) per iscrizione da Apple/Google/Outlook Calendar** ("aggiungi
+  calendario da URL"): un URL con un token segreto rigenerabile dalle Impostazioni, servito da
+  una Supabase Edge Function (`supabase/functions/calendar-feed`) che genera il `.ics` al volo.
+  - **A senso unico**: quello che il trainer inserisce nell'app compare nel calendario del
+    telefono. Il contrario no. Un vero sync bidirezionale richiederebbe CalDAV — non nel piano
+    attuale.
+  - L'aggiornamento non è immediato: dipende dall'intervallo di polling che l'app di calendario
+    (Apple/Google/Outlook) decide per conto suo, non controllabile da qui.
+  - Il token, non la sessione Supabase, è l'autenticazione: le app di calendario non sanno fare
+    login interattivo per una sottoscrizione. Va quindi trattato come un segreto rigenerabile,
+    non come l'anon key (pubblica per definizione).
+
 ## 4. Funzionalità future (fuori scope ora)
 
 - Wrapper Electron per una versione desktop installabile (stesso codice React).
 - Supporto offline reale per i dati (coda di scritture locali + sync quando torna la rete).
 - Multi-trainer / multi-tenant vero (oggi un solo account, schema comunque compatibile con
   un'estensione futura, vedi §7).
-- Notifiche native, calendario/agenda, statistiche di progresso cliente, invio PDF via email.
+- Sync bidirezionale del calendario (CalDAV) — il feed .ics di §3.7 resta a senso unico.
+- Notifiche native, statistiche di progresso cliente, invio PDF via email.
 - Generazione PDF server-side, se il rendering client-side risultasse insufficiente.
 
 ## 5. Requisiti non funzionali
@@ -271,10 +293,22 @@ trainer_settings (
   owner_id uuid primary key references auth.users(id) on delete cascade default auth.uid(),
   business_name text, logo_url text, primary_color text, secondary_color text,
   address text, phone text, email text,
-  reminder_days_before integer default 7
+  reminder_days_before integer default 7,
+  calendar_feed_token text unique default encode(gen_random_bytes(24), 'hex')  -- §3.7
 )
 -- [A7] la riga viene creata da un trigger su auth.users: senza, ogni lettura
 -- delle impostazioni doveva gestire "non esiste ancora".
+
+appointments (                       -- §3.7, aggiunta a posteriori (0005/0006)
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  client_id uuid references clients(id) on delete set null,
+  title text not null,
+  appointment_date date not null, start_time time not null,
+  duration_minutes integer not null default 60,
+  notes text,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+)
 ```
 
 Nota: `owner_id` è presente fin da ora (anche con un solo trainer) proprio per non dover

@@ -309,6 +309,7 @@ export const IMPOSTAZIONI_SEED: Impostazioni = {
   phone: '02 1234567',
   email: 'info@studioforma.it',
   reminder_days_before: 7,
+  calendar_feed_token: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
 }
 
 export const SESSIONE_SEED = { userId: OWNER, email: 'trainer@example.it' }

@@ -5,7 +5,7 @@ import { ErroreDati, traduciErrore } from '../errors'
 import type { ImpostazioniApi } from '../types'
 
 const CAMPI =
-  'owner_id, business_name, logo_url, primary_color, secondary_color, address, phone, email, reminder_days_before'
+  'owner_id, business_name, logo_url, primary_color, secondary_color, address, phone, email, reminder_days_before, calendar_feed_token'
 
 function vuote(ownerId: string): Impostazioni {
   return {
@@ -18,6 +18,7 @@ function vuote(ownerId: string): Impostazioni {
     phone: null,
     email: null,
     reminder_days_before: SOGLIA_REMINDER_DEFAULT,
+    calendar_feed_token: null,
   }
 }
 
@@ -48,5 +49,11 @@ export const impostazioniSupabase: ImpostazioniApi = {
       .single()
     if (error) throw traduciErrore(error, 'salvare le impostazioni')
     return data as Impostazioni
+  },
+
+  async rigeneraTokenCalendario() {
+    const { data, error } = await supabase().rpc('rigenera_token_calendario')
+    if (error) throw traduciErrore(error, 'rigenerare il link del calendario')
+    return data
   },
 }

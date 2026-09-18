@@ -9,10 +9,20 @@ import { useToast } from "@/components/ui/Toast";
 import {
   useImpostazioni,
   useSalvaImpostazioni,
+  useRigeneraTokenCalendario,
 } from "@/features/settings/useSettings";
 import { SOGLIA_REMINDER_DEFAULT } from "@/features/plans/planExpiry";
 import { messaggioErrore, type ImpostazioniInput } from "@/data";
 import { useAuth } from "@/components/auth/AuthProvider";
+
+const SUPABASE_URL_FEED = import.meta.env.VITE_SUPABASE_URL as
+  | string
+  | undefined;
+
+function urlFeedCalendario(token: string): string {
+  if (!SUPABASE_URL_FEED) return "";
+  return `${SUPABASE_URL_FEED}/functions/v1/calendar-feed?token=${token}`;
+}
 
 const opzionale = z
   .string()
@@ -54,6 +64,7 @@ type CampiPuliti = z.output<typeof schema>;
 export default function Settings() {
   const impostazioni = useImpostazioni();
   const salva = useSalvaImpostazioni();
+  const rigeneraToken = useRigeneraTokenCalendario();
   const toast = useToast();
   const { esci, sessione } = useAuth();
 
@@ -252,6 +263,80 @@ export default function Settings() {
           )}
         </div>
       </form>
+
+      <section className="mt-12 max-w-2xl border-t border-line pt-5">
+        <h2 className="display-tight text-lg">Feed calendario</h2>
+        <p className="mt-1 text-sm text-muted">
+          Iscriviti a questo indirizzo da Apple Calendar, Google Calendar o
+          Outlook (&quot;aggiungi calendario da URL&quot;) per vedere i tuoi
+          appuntamenti anche sul telefono. Funziona in un verso solo: quello
+          che inserisci qui compare lì, non il contrario. L&apos;app di
+          calendario ricontrolla periodicamente da sola — di solito entro
+          poche ore, non è immediato.
+        </p>
+
+        {impostazioni.data?.calendar_feed_token ? (
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              readOnly
+              value={urlFeedCalendario(impostazioni.data.calendar_feed_token)}
+              onFocus={(e) => e.currentTarget.select()}
+              className="font-mono text-xs sm:flex-1"
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(
+                      urlFeedCalendario(
+                        impostazioni.data!.calendar_feed_token!,
+                      ),
+                    )
+                    .then(() => toast.conferma("Link copiato."))
+                    .catch(() =>
+                      toast.errore("Non sono riuscito a copiare il link."),
+                    );
+                }}
+              >
+                Copia
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Rigenerare il link? Quello attuale smetterà di funzionare: dovrai iscriverti di nuovo su ogni dispositivo.",
+                    )
+                  )
+                    return;
+                  rigeneraToken.mutate(undefined, {
+                    onSuccess: () => toast.conferma("Nuovo link generato."),
+                    onError: (errore) =>
+                      toast.errore(messaggioErrore(errore)),
+                  });
+                }}
+                disabled={rigeneraToken.isPending}
+              >
+                {rigeneraToken.isPending ? "Rigenero…" : "Rigenera link"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            className="mt-4"
+            onClick={() =>
+              rigeneraToken.mutate(undefined, {
+                onError: (errore) => toast.errore(messaggioErrore(errore)),
+              })
+            }
+            disabled={rigeneraToken.isPending}
+          >
+            {rigeneraToken.isPending ? "Genero…" : "Genera link"}
+          </Button>
+        )}
+      </section>
 
       <section className="mt-12 max-w-2xl border-t border-line pt-5">
         <h2 className="display-tight text-lg">Accesso</h2>
