@@ -229,6 +229,16 @@ dialog[open].dialog-surface {
   font-variant-numeric: tabular-nums;
 }
 
+.client-detail-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 80rem) {
+  .client-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* --- Stampa ---------------------------------------------------------------
    PRD §3.4: l'export è la stampa nativa del browser su questa pagina. */
 

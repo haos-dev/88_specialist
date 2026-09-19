@@ -3,11 +3,12 @@ import { cn } from "@/lib/cn";
 import type { StatoScadenza } from "@/types/domain";
 import { formatGiorniResidui } from "@/lib/dates";
 
-type Tono = "neutro" | "accento" | "scaduta" | "scadenza";
+type Tono = "neutro" | "accento" | "positivo" | "scaduta" | "scadenza";
 
 const TONI: Record<Tono, string> = {
   neutro: "border-line text-muted",
   accento: "border-accent/45 bg-teal-soft text-accent-hover",
+  positivo: "border-[#4ade80]/40 bg-[#14532d] text-[#bbf7d0]",
   scaduta: "border-scaduta/35 bg-scaduta-soft text-scaduta",
   scadenza: "border-scadenza/35 bg-scadenza-soft text-scadenza",
 };
@@ -49,6 +50,15 @@ export function BadgeScadenza({
       {giorniResidui === null
         ? "In scadenza"
         : formatGiorniResidui(giorniResidui)}
+    </Badge>
+  );
+}
+
+/** Mostra sempre i giorni residui quando una scheda ha una data di fine. */
+export function BadgeGiorniResidui({ giorni }: { giorni: number }) {
+  return (
+    <Badge tono={giorni > 7 ? "positivo" : "scaduta"}>
+      {formatGiorniResidui(giorni)}
     </Badge>
   );
 }

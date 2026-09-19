@@ -34,12 +34,14 @@ export default function Dashboard() {
     <div className="mx-auto w-full max-w-[1440px]">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-5 border-b border-line pb-5">
         <div>
-          <p className="mb-2 text-m font-bold text-accent">
-            Fitness Specialist 88
-          </p>
-          <h1 className="display text-4xl leading-none text-ink sm:text-5xl">
-            Ciao, Giovanni!
-          </h1>
+          <div>
+            <h1 className="display text-4xl leading-none text-ink sm:text-3xl">
+              Ciao,{" "}
+              <h1 className="display text-4xl leading-none text-accent sm:text-5xl">
+                Giovanni!
+              </h1>
+            </h1>
+          </div>
         </div>
         <Link to="/clienti?nuovo=1">
           <Button
