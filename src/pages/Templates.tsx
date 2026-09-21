@@ -1,283 +1,124 @@
-import { useEffect, useState } from 'react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { ConfirmDialog } from '@/components/ui/Dialog'
-import { Select } from '@/components/ui/Field'
-import { SearchInput } from '@/components/ui/SearchInput'
-import { Caricamento, Errore, Vuoto } from '@/components/ui/Stato'
-import { useToast } from '@/components/ui/Toast'
-import { ExerciseForm } from '@/features/exercises/ExerciseForm'
-import {
-  ESERCIZI_PER_PAGINA,
-  useAggiornaEsercizio,
-  useArchiviaEsercizio,
-  useCreaEsercizio,
-  useEliminaEsercizio,
-  useEsercizi,
-  useGruppiMuscolari,
-  useUtilizziEsercizio,
-} from '@/features/exercises/useExercises'
-import { messaggioErrore } from '@/data'
-import type { Esercizio } from '@/types/domain'
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/Button";
+import { Stato, Vuoto } from "@/components/ui/Stato";
+import { useToast } from "@/components/ui/Toast";
+import { ExerciseLibraryDialog } from "@/features/exercises/ExerciseLibraryDialog";
+import { TemplateForm } from "@/features/plans/TemplateForm";
+import { useCreaTemplate, useTemplates } from "@/features/plans/usePlans";
+import { messaggioErrore } from "@/data";
+import { Database, FilePlusCorner } from "lucide-react";
 
-export default function Exercises() {
-  const [ricerca, setRicerca] = useState('')
-  const [gruppo, setGruppo] = useState<string>('')
-  const [includiArchiviati, setIncludiArchiviati] = useState(false)
-  const [pagina, setPagina] = useState(0)
+/**
+ * §3.7bis: un template è una scheda senza cliente (client_id null,
+ * is_template true) — struttura una volta, applica a chiunque. Vive accanto
+ * alla libreria esercizi perché, come gli esercizi, è materiale riutilizzabile
+ * che non appartiene a un cliente specifico. Applica ed elimina stanno nel
+ * builder, aprendo il template.
+ */
+export default function Templates() {
+  const navigate = useNavigate();
 
-  const [inModifica, setInModifica] = useState<Esercizio | null>(null)
-  const [formAperto, setFormAperto] = useState(false)
-  const [daEliminare, setDaEliminare] = useState<Esercizio | null>(null)
+  const [bibliotecaAperta, setBibliotecaAperta] = useState(false);
+  const [templateFormAperto, setTemplateFormAperto] = useState(false);
 
-  const toast = useToast()
-  const gruppi = useGruppiMuscolari()
-  const elenco = useEsercizi({
-    ricerca,
-    gruppoMuscolare: gruppo || null,
-    includiArchiviati,
-    pagina,
-    perPagina: ESERCIZI_PER_PAGINA,
-  })
+  const toast = useToast();
 
-  const crea = useCreaEsercizio()
-  const aggiorna = useAggiornaEsercizio()
-  const archivia = useArchiviaEsercizio()
-  const elimina = useEliminaEsercizio()
-  const utilizzi = useUtilizziEsercizio(daEliminare?.id)
-
-  // Cambiare filtro con la pagina 5 aperta lascerebbe una griglia vuota.
-  useEffect(() => setPagina(0), [ricerca, gruppo, includiArchiviati])
-
-  const totale = elenco.data?.totale ?? 0
-  const pagine = Math.max(1, Math.ceil(totale / ESERCIZI_PER_PAGINA))
-  const righe = elenco.data?.righe ?? []
-
-  const apriNuovo = () => {
-    setInModifica(null)
-    setFormAperto(true)
-  }
+  const templates = useTemplates();
+  const creaTemplate = useCreaTemplate();
 
   return (
     <>
-      <PageHeader
-        titolo="Esercizi"
-        descrizione="La libreria condivisa da cui peschi quando costruisci una scheda."
-        azioni={
-          <Button variante="primario" onClick={apriNuovo}>
-            Nuovo esercizio
-          </Button>
-        }
-      />
-
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <SearchInput
-          etichetta="Cerca fra gli esercizi"
-          placeholder="Cerca per nome"
-          valore={ricerca}
-          onChange={setRicerca}
-          className="w-full sm:max-w-72"
-        />
-
-        <Select
-          value={gruppo}
-          onChange={(e) => setGruppo(e.target.value)}
-          aria-label="Filtra per gruppo muscolare"
-          className="sm:max-w-52"
-        >
-          <option value="">Tutti i gruppi</option>
-          {(gruppi.data ?? []).map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </Select>
-
-        <label className="flex items-center gap-2 text-sm text-muted">
-          <input
-            type="checkbox"
-            checked={includiArchiviati}
-            onChange={(e) => setIncludiArchiviati(e.target.checked)}
-            className="h-3.5 w-3.5 accent-[var(--color-accent)]"
-          />
-          Mostra archiviati
-        </label>
-
-        {totale > 0 && (
-          <p className="nums ml-auto text-sm text-muted">
-            {totale} {totale === 1 ? 'esercizio' : 'esercizi'}
-          </p>
-        )}
-      </div>
-
-      {elenco.isLoading ? (
-        <Caricamento />
-      ) : elenco.error ? (
-        <Errore errore={elenco.error} onRiprova={() => void elenco.refetch()} />
-      ) : righe.length === 0 ? (
-        <Vuoto
-          titolo={ricerca || gruppo ? 'Nessun esercizio con questi filtri' : 'La libreria è vuota'}
-          descrizione={
-            ricerca || gruppo
-              ? 'Prova con un altro nome o togli il filtro per gruppo muscolare.'
-              : 'Aggiungi un esercizio a mano, oppure importa il dataset con lo script di seed.'
-          }
-          azione={
-            !ricerca && !gruppo ? (
-              <Button variante="primario" onClick={apriNuovo}>
-                Nuovo esercizio
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : (
-        <ul className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
-          {righe.map((esercizio) => (
-            <li key={esercizio.id} className="flex gap-3 border-t border-line pt-3">
-              {esercizio.media_url ? (
-                <img
-                  src={esercizio.media_url}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="h-16 w-20 shrink-0 border border-line object-cover"
-                />
-              ) : (
-                <div className="h-16 w-20 shrink-0 border border-dashed border-line" aria-hidden="true" />
-              )}
-
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-ink" title={esercizio.name}>
-                  {esercizio.name}
-                </p>
-                <p className="mt-0.5 text-xs text-muted">
-                  {esercizio.muscle_group ?? 'Gruppo non indicato'}
-                </p>
-                {esercizio.archived && (
-                  <Badge className="mt-1.5">Archiviato</Badge>
-                )}
-
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                  <button
-                    type="button"
-                    className="text-muted underline-offset-4 hover:text-accent hover:underline"
-                    onClick={() => {
-                      setInModifica(esercizio)
-                      setFormAperto(true)
-                    }}
-                  >
-                    Modifica
-                  </button>
-                  <button
-                    type="button"
-                    className="text-muted underline-offset-4 hover:text-accent hover:underline"
-                    onClick={() =>
-                      archivia.mutate(
-                        { id: esercizio.id, archiviato: !esercizio.archived },
-                        {
-                          onSuccess: () =>
-                            toast.conferma(
-                              esercizio.archived
-                                ? `${esercizio.name} è di nuovo in libreria.`
-                                : `${esercizio.name} è stato archiviato.`,
-                            ),
-                          onError: (errore) => toast.errore(messaggioErrore(errore)),
-                        },
-                      )
-                    }
-                  >
-                    {esercizio.archived ? 'Ripristina' : 'Archivia'}
-                  </button>
-                  <button
-                    type="button"
-                    className="text-muted underline-offset-4 hover:text-scaduta hover:underline"
-                    onClick={() => setDaEliminare(esercizio)}
-                  >
-                    Elimina
-                  </button>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {pagine > 1 && (
-        <nav
-          className="mt-8 flex items-center justify-between border-t border-line pt-4"
-          aria-label="Paginazione esercizi"
-        >
-          <Button dimensione="sm" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>
-            Precedenti
-          </Button>
-          <p className="nums text-sm text-muted">
-            Pagina {pagina + 1} di {pagine}
-          </p>
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-5 border-b border-line pb-5">
+        <div>
+          <h1 className="display text-4xl leading-none text-ink sm:text-5xl">
+            Templates
+          </h1>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
           <Button
-            dimensione="sm"
-            disabled={pagina >= pagine - 1}
-            onClick={() => setPagina((p) => p + 1)}
+            aria-label="Libreria esercizi"
+            title="Libreria esercizi"
+            onClick={() => setBibliotecaAperta(true)}
+            className="flex min-h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 text-sm text-muted transition-[background-color,border-color,color,transform] duration-100 hover:border-accent/45 hover:text-accent active:scale-[0.98]"
           >
-            Successivi
+            <Database aria-hidden="true" size={19} strokeWidth={2.2} />
           </Button>
-        </nav>
+          <Button
+            variante="primario"
+            aria-label="Nuovo template"
+            title="Nuovo template"
+            className="h-10 gap-2 px-3"
+            onClick={() => setTemplateFormAperto(true)}
+          >
+            <FilePlusCorner aria-hidden="true" size={19} strokeWidth={2.2} />
+          </Button>
+        </div>
+      </header>
+
+      <Stato
+        caricamento={templates.isLoading}
+        errore={templates.error}
+        dati={templates.data}
+        onRiprova={() => void templates.refetch()}
+        eVuoto={(d) => d.length === 0}
+        vuoto={
+          <Vuoto
+            titolo="Non hai ancora nessun template"
+            descrizione="Crea il tuo primo template da associare a un cliente."
+            azione={
+              <Button
+                variante="primario"
+                aria-label="Nuovo template"
+                title="Nuovo template"
+                onClick={() => setTemplateFormAperto(true)}
+              >
+                <FilePlusCorner aria-hidden="true" size={19} strokeWidth={2.2} />
+              </Button>
+            }
+          />
+        }
+      >
+        {(righe) => (
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {righe.map((template) => (
+              <li key={template.id}>
+                <Link
+                  to={`/schede/${template.id}`}
+                  className="flex min-h-20 items-center rounded-[18px] border border-line bg-surface px-5 py-4 text-lg font-medium text-ink transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-0.5 hover:border-accent/50 hover:bg-[#202527] hover:text-accent active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2"
+                >
+                  {template.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Stato>
+
+      {bibliotecaAperta && (
+        <ExerciseLibraryDialog
+          aperto={bibliotecaAperta}
+          onChiudi={() => setBibliotecaAperta(false)}
+        />
       )}
 
-      <ExerciseForm
-        aperto={formAperto}
-        esercizio={inModifica}
-        gruppi={gruppi.data ?? []}
-        inCorso={crea.isPending || aggiorna.isPending}
-        onChiudi={() => setFormAperto(false)}
-        onSalva={(input) => {
-          const opzioni = {
-            onSuccess: () => {
-              setFormAperto(false)
-              toast.conferma(inModifica ? 'Modifiche salvate.' : `${input.name} è stato aggiunto.`)
+      <TemplateForm
+        aperto={templateFormAperto}
+        inCorso={creaTemplate.isPending}
+        onChiudi={() => setTemplateFormAperto(false)}
+        onSalva={(input) =>
+          creaTemplate.mutate(input, {
+            onSuccess: (nuovo) => {
+              setTemplateFormAperto(false);
+              toast.conferma(
+                "Template creato: ora aggiungici giorni ed esercizi.",
+              );
+              navigate(`/schede/${nuovo.id}`);
             },
-            onError: (errore: unknown) => toast.errore(messaggioErrore(errore)),
-          }
-          if (inModifica) aggiorna.mutate({ id: inModifica.id, input }, opzioni)
-          else crea.mutate(input, opzioni)
-        }}
-      />
-
-      {/* PRD §3.2: prima di eliminare, l'app dice se e dove l'esercizio è usato. */}
-      <ConfirmDialog
-        aperto={daEliminare !== null}
-        titolo={daEliminare ? `Eliminare ${daEliminare.name}?` : ''}
-        descrizione={
-          utilizzi.isLoading
-            ? 'Controllo in quante schede è usato…'
-            : (utilizzi.data ?? 0) > 0
-              ? `È usato in ${utilizzi.data} ${utilizzi.data === 1 ? 'riga di scheda' : 'righe di scheda'}, quindi non può essere eliminato: le schede esistenti smetterebbero di avere senso. Archivialo per toglierlo dalla libreria lasciando intatto lo storico.`
-              : 'Non è usato in nessuna scheda. L’eliminazione è definitiva.'
+            onError: (errore) => toast.errore(messaggioErrore(errore)),
+          })
         }
-        etichettaConferma={(utilizzi.data ?? 0) > 0 ? 'Archivia invece' : 'Elimina definitivamente'}
-        distruttivo={(utilizzi.data ?? 0) === 0}
-        inCorso={elimina.isPending || archivia.isPending || utilizzi.isLoading}
-        onAnnulla={() => setDaEliminare(null)}
-        onConferma={() => {
-          if (!daEliminare) return
-          const nome = daEliminare.name
-          const opzioni = {
-            onSuccess: () => {
-              setDaEliminare(null)
-              toast.conferma(`${nome} è stato ${(utilizzi.data ?? 0) > 0 ? 'archiviato' : 'eliminato'}.`)
-            },
-            onError: (errore: unknown) => {
-              setDaEliminare(null)
-              toast.errore(messaggioErrore(errore))
-            },
-          }
-          if ((utilizzi.data ?? 0) > 0) {
-            archivia.mutate({ id: daEliminare.id, archiviato: true }, opzioni)
-          } else {
-            elimina.mutate(daEliminare.id, opzioni)
-          }
-        }}
       />
     </>
-  )
+  );
 }

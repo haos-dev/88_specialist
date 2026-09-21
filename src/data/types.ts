@@ -13,6 +13,8 @@ import type {
   SchedaCompleta,
   SchedaInput,
   SchedaSintesi,
+  TemplateInput,
+  TemplateSintesi,
 } from "@/types/domain";
 
 /* ------------------------------------------------------------------ auth */
@@ -72,7 +74,6 @@ export interface ClientiApi {
 export interface FiltroEsercizi {
   ricerca: string;
   gruppoMuscolare: string | null;
-  includiArchiviati: boolean;
   /** Audit B3: il dataset è di ~1300 righe, si pagina lato server. */
   pagina: number;
   perPagina: number;
@@ -88,7 +89,6 @@ export interface EserciziApi {
   dettaglio(id: string): Promise<Esercizio | null>;
   crea(input: EsercizioInput): Promise<Esercizio>;
   aggiorna(id: string, input: EsercizioInput): Promise<Esercizio>;
-  impostaArchiviato(id: string, archiviato: boolean): Promise<Esercizio>;
   /** Quante righe di scheda usano questo esercizio (PRD §3.2: avviso prima di eliminare). */
   utilizzi(id: string): Promise<number>;
   elimina(id: string): Promise<void>;
@@ -125,6 +125,27 @@ export interface SchedeApi {
   aggiornaEsercizio(rowId: string, input: GiornoEsercizioInput): Promise<void>;
   rimuoviEsercizio(rowId: string): Promise<void>;
   riordinaEsercizi(dayId: string, posizioni: Riordino[]): Promise<void>;
+
+  /* ------------------------------------------------------------ template */
+  // §3.7bis: un template è una Scheda con client_id null e is_template true.
+  // Condivide giorni/esercizi/drag&drop con le schede normali (gli hook e i
+  // metodi qui sopra restano validi per un template tanto quanto per una
+  // scheda) — questi cinque metodi coprono solo ciò che è specifico dei
+  // template: elenco, creazione, modifica, applicazione a un cliente,
+  // eliminazione diretta (nessuna regola "solo se archiviato": un template
+  // non ha schede dipendenti da proteggere).
+  elencoTemplate(): Promise<TemplateSintesi[]>;
+  creaTemplate(input: TemplateInput): Promise<Scheda>;
+  aggiornaTemplate(id: string, input: TemplateInput): Promise<Scheda>;
+  /** Copia profonda su un cliente specifico (gemella di `rinnova`). */
+  applicaTemplate(
+    templateId: string,
+    clientId: string,
+    titolo: string,
+    inizio: string | null,
+    fine: string | null,
+  ): Promise<Scheda>;
+  eliminaTemplate(id: string): Promise<void>;
 }
 
 /* --------------------------------------------------------- impostazioni */

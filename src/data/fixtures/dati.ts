@@ -261,6 +261,9 @@ function cliente(
     email: `${first.toLowerCase()}.${last.toLowerCase()}@example.it`,
     phone: null,
     birth_date: null,
+    height_cm: null,
+    weight_kg: null,
+    goal: null,
     notes: null,
     active: true,
     created_at: `${OGGI}T09:00:00Z`,
@@ -273,18 +276,25 @@ export const CLIENTI_SEED: Cliente[] = [
   cliente("cl-001", "Mario", "Rossi", {
     phone: "333 1234567",
     birth_date: "1988-04-12",
+    height_cm: 178,
+    weight_kg: 82.5,
+    goal: "Ipertrofia, focus su petto e spalle",
     notes:
       "Vecchio infortunio alla spalla destra: niente lento dietro, alzate laterali sotto i 90°.",
   }),
   cliente("cl-002", "Giulia", "Bianchi", {
     phone: "347 9988776",
     birth_date: "1995-11-03",
+    height_cm: 165,
+    weight_kg: 61,
+    goal: "Ricomposizione corporea",
     notes:
       "Obiettivo ricomposizione. Si allena tre volte a settimana, lunedì/mercoledì/venerdì.",
   }),
   cliente("cl-003", "Luca", "Ferrari", { birth_date: "1979-01-27" }),
   cliente("cl-004", "Sara", "Conti", {
     phone: "340 5566778",
+    goal: "Mezza maratona in aprile",
     notes:
       "Preparazione mezza maratona ad aprile. Pesi due volte a settimana, il resto è corsa.",
   }),
@@ -297,7 +307,7 @@ export const CLIENTI_SEED: Cliente[] = [
 
 function scheda(
   id: string,
-  clientId: string,
+  clientId: string | null,
   title: string,
   inizio: string | null,
   fine: string | null,
@@ -312,6 +322,7 @@ function scheda(
     end_date: fine,
     notes: null,
     status: "active",
+    is_template: false,
     created_at: `${OGGI}T09:00:00Z`,
     updated_at: `${OGGI}T09:00:00Z`,
     ...extra,
@@ -366,6 +377,12 @@ export const SCHEDE_SEED: Scheda[] = [
       status: "archived",
     },
   ),
+  // Template (§3.7bis): client_id null, is_template true. Niente date: un
+  // template non è legato a un periodo, lo decide chi lo applica a un cliente.
+  scheda("pl-tpl-001", null, "Full body — 3 giorni", null, null, {
+    is_template: true,
+    notes: "Struttura base per chi inizia: un giorno di riposo tra le sedute.",
+  }),
 ];
 
 interface SemeGiorno {
@@ -455,6 +472,24 @@ const SEMI_GIORNI: SemeGiorno[] = [
       ["Leg press", "3", "15", 60],
       ["Lat machine presa larga", "3", "15", 60],
       ["Crunch a terra", "3", "20", 45],
+    ],
+  },
+  {
+    planId: "pl-tpl-001",
+    nome: "Giorno A — spinta",
+    esercizi: [
+      ["Panca piana con bilanciere", "3", "10", 90],
+      ["Leg press", "3", "12", 90],
+      ["Push down ai cavi", "3", "12", 60],
+    ],
+  },
+  {
+    planId: "pl-tpl-001",
+    nome: "Giorno B — trazione",
+    esercizi: [
+      ["Lat machine presa larga", "3", "12", 90],
+      ["Stacco rumeno", "3", "10", 90],
+      ["Curl con bilanciere", "3", "12", 60],
     ],
   },
 ];

@@ -9,6 +9,8 @@ import {
   Phone,
   Plus,
   RotateCcw,
+  Ruler,
+  Target,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -69,10 +71,6 @@ export default function ClientDetail() {
   const c = cliente.data;
   const nomeCompleto = `${c.first_name} ${c.last_name}`;
   const elencoSchede = schede.data ?? [];
-  const schedeAttive = elencoSchede.filter(
-    (scheda) => scheda.status === "active",
-  ).length;
-  const schedeArchiviate = elencoSchede.length - schedeAttive;
 
   const cambiaStato = () => {
     archivia.mutate(
@@ -151,17 +149,34 @@ export default function ClientDetail() {
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-2 border-t border-line pt-5">
-            <div className="rounded-[12px] border border-line px-3 py-3">
-              <p className="nums text-2xl font-semibold text-ink">
-                {schedeAttive}
-              </p>
-              <p className="mt-1 text-xs text-muted">Schede attive</p>
+            <div className="flex min-h-16 items-center rounded-[12px] border border-line px-3 py-3">
+              {c.height_cm != null || c.weight_kg != null ? (
+                <div className="flex items-center gap-3 text-sm font-semibold text-ink">
+                  <Ruler
+                    aria-hidden="true"
+                    className="shrink-0 text-accent"
+                    size={23}
+                  />
+                  {[
+                    c.height_cm != null ? `${c.height_cm} cm` : null,
+                    c.weight_kg != null ? `${c.weight_kg} kg` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              ) : null}
             </div>
-            <div className="rounded-[12px] border border-line px-3 py-3">
-              <p className="nums text-2xl font-semibold text-ink">
-                {schedeArchiviate}
-              </p>
-              <p className="mt-1 text-xs text-muted">Archiviate</p>
+            <div className="flex min-h-16 items-center rounded-[12px] border border-line px-3 py-3">
+              {c.goal ? (
+                <div className="flex items-center gap-3 text-sm font-semibold text-ink">
+                  <Target
+                    aria-hidden="true"
+                    className="shrink-0 text-accent"
+                    size={23}
+                  />
+                  {c.goal}
+                </div>
+              ) : null}
             </div>
           </div>
 

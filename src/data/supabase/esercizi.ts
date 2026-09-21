@@ -24,7 +24,6 @@ export const eserciziSupabase: EserciziApi = {
       .order('name', { ascending: true })
       .range(da, a)
 
-    if (!filtro.includiArchiviati) q = q.eq('archived', false)
     if (filtro.gruppoMuscolare) q = q.eq('muscle_group', filtro.gruppoMuscolare)
     if (filtro.ricerca.trim()) q = q.ilike('name', `%${escapeLike(filtro.ricerca.trim())}%`)
 
@@ -64,18 +63,6 @@ export const eserciziSupabase: EserciziApi = {
     return data as Esercizio
   },
 
-  async impostaArchiviato(id, archiviato) {
-    const { data, error } = await supabase()
-      .from('exercises')
-      .update({ archived: archiviato })
-      .eq('id', id)
-      .select(CAMPI)
-      .single()
-    if (error)
-      throw traduciErrore(error, archiviato ? "archiviare l'esercizio" : "ripristinare l'esercizio")
-    return data as Esercizio
-  },
-
   async utilizzi(id) {
     const { count, error } = await supabase()
       .from('workout_day_exercises')
@@ -88,14 +75,14 @@ export const eserciziSupabase: EserciziApi = {
   async elimina(id) {
     // Audit A2: la FK è `on delete restrict`, quindi Postgres rifiuta la
     // cancellazione se l'esercizio è in una scheda. La UI avvisa prima e
-    // propone l'archiviazione; qui traduciamo comunque il 23503.
+    // blocca l'eliminazione; qui traduciamo comunque il 23503.
     const { error } = await supabase().from('exercises').delete().eq('id', id)
     if (error) {
       const tradotto = traduciErrore(error, "eliminare l'esercizio")
       if (tradotto.causa === 'vincolo') {
         throw new ErroreDati(
           'vincolo',
-          "Questo esercizio è usato in almeno una scheda. Archivialo invece di eliminarlo, così le schede esistenti restano leggibili.",
+          "Questo esercizio è usato in almeno una scheda. Toglilo dalle schede prima di eliminarlo, così restano leggibili.",
         )
       }
       throw tradotto

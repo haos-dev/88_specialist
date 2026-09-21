@@ -35,10 +35,11 @@ export interface GiornoEspanso extends Giorno {
 
 /** Scheda completa: quello che servono sia il builder sia la stampa. */
 export interface SchedaCompleta extends Scheda {
+  /** null solo per un template (§3.7bis): non ha un cliente. */
   cliente: Pick<
     Cliente,
     "id" | "first_name" | "last_name" | "email" | "phone" | "active"
-  >;
+  > | null;
   giorni: GiornoEspanso[];
 }
 
@@ -55,6 +56,26 @@ export interface AppuntamentoInput {
 export interface SchedaSintesi extends Scheda {
   cliente_nome: string;
   giorni_count: number;
+}
+
+/**
+ * Template di allenamento (§3.7bis): una `Scheda` con `client_id = null` e
+ * `is_template = true`. Riepilogo per la griglia nella pagina Esercizi —
+ * non serve `cliente_nome`, un template non ne ha uno.
+ */
+export interface TemplateSintesi {
+  id: string;
+  title: string;
+  notes: string | null;
+  giorni_count: number;
+  esercizi_count: number;
+  created_at: string;
+}
+
+/** Payload di creazione/modifica di un template (solo titolo e note: niente date, niente cliente). */
+export interface TemplateInput {
+  title: string;
+  notes: string | null;
 }
 
 /**
@@ -76,6 +97,9 @@ export interface ClienteInput {
   email: string | null;
   phone: string | null;
   birth_date: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  goal: string | null;
   notes: string | null;
 }
 

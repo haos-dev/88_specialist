@@ -29,6 +29,9 @@ export type ClientRow = {
   email: string | null;
   phone: string | null;
   birth_date: string | null; // date, ISO 'YYYY-MM-DD'
+  height_cm: number | null;
+  weight_kg: number | null;
+  goal: string | null;
   notes: string | null;
   active: boolean;
   created_at: string;
@@ -51,12 +54,14 @@ export type ExerciseRow = {
 export type WorkoutPlanRow = {
   id: string;
   owner_id: string;
-  client_id: string;
+  /** null solo per i template (is_template = true): PRD §3.7bis. */
+  client_id: string | null;
   title: string;
   start_date: string | null;
   end_date: string | null;
   notes: string | null;
   status: PlanStatus;
+  is_template: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -115,6 +120,7 @@ type ConDefault =
   | "active"
   | "archived"
   | "status"
+  | "is_template"
   | "day_order"
   | "order_index";
 
@@ -189,6 +195,17 @@ export type Database = {
       rinnova_scheda: {
         Args: {
           p_plan_id: string;
+          p_titolo: string;
+          p_inizio: string | null;
+          p_fine: string | null;
+        };
+        Returns: WorkoutPlanRow;
+      };
+      /** Copia un template su un cliente specifico, come rinnova_scheda ma verso un client_id diverso (0007). */
+      applica_template: {
+        Args: {
+          p_template_id: string;
+          p_client_id: string;
           p_titolo: string;
           p_inizio: string | null;
           p_fine: string | null;

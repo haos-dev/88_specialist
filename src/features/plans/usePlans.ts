@@ -150,6 +150,79 @@ export function useRinnovaScheda() {
   });
 }
 
+/* -------------------------------------------------------------------- template */
+// §3.7bis: un template condivide giorni/esercizi con le schede normali, quindi
+// riusa gli hook di quella sezione (useAggiungiGiorno, useRiordinaEsercizi,
+// ecc. — prendono un planId, non sanno né gli importa se è un template).
+// Questi cinque coprono solo ciò che è specifico dei template.
+
+export function useTemplates() {
+  return useQuery({
+    queryKey: chiavi.schede.template,
+    queryFn: () => dati.schede.elencoTemplate(),
+  });
+}
+
+export function useCreaTemplate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { title: string; notes: string | null }) =>
+      dati.schede.creaTemplate(input),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: chiavi.schede.template }),
+  });
+}
+
+export function useAggiornaTemplate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: { title: string; notes: string | null };
+    }) => dati.schede.aggiornaTemplate(id, input),
+    onSuccess: (_template, { id }) => {
+      client.invalidateQueries({ queryKey: chiavi.schede.template });
+      client.invalidateQueries({ queryKey: chiavi.schede.dettaglio(id) });
+    },
+  });
+}
+
+export function useApplicaTemplate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      templateId,
+      clientId,
+      titolo,
+      inizio,
+      fine,
+    }: {
+      templateId: string;
+      clientId: string;
+      titolo: string;
+      inizio: string | null;
+      fine: string | null;
+    }) => dati.schede.applicaTemplate(templateId, clientId, titolo, inizio, fine),
+    // La nuova scheda finisce sotto un cliente: invalida come una creazione
+    // normale (compare nell'elenco schede di quel cliente e nel conteggio).
+    onSuccess: () => invalidaTutteLeSchede(client),
+  });
+}
+
+export function useEliminaTemplate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => dati.schede.eliminaTemplate(id),
+    onSuccess: (_void, id) => {
+      client.removeQueries({ queryKey: chiavi.schede.dettaglio(id) });
+      client.invalidateQueries({ queryKey: chiavi.schede.template });
+    },
+  });
+}
+
 /* -------------------------------------------------------------------- giorni */
 
 export function useAggiungiGiorno(planId: string) {

@@ -55,6 +55,7 @@ export const chiavi = {
     perCliente: (clientId: string) => ["schede", "cliente", clientId] as const,
     inScadenza: ["schede", "in-scadenza"] as const,
     dettaglio: (id: string) => ["schede", "dettaglio", id] as const,
+    template: ["schede", "template"] as const,
   },
   impostazioni: ["impostazioni"] as const,
 } as const;

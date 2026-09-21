@@ -12,7 +12,7 @@ import { useSchedeInScadenza } from "@/features/plans/usePlans";
 const VOCI = [
   { a: "/", etichetta: "Dashboard", esatta: true, Icona: LayoutDashboard },
   { a: "/clienti", etichetta: "Clienti", esatta: false, Icona: Users },
-  { a: "/esercizi", etichetta: "Esercizi", esatta: false, Icona: Dumbbell },
+  { a: "/templates", etichetta: "Templates", esatta: false, Icona: Dumbbell },
   {
     a: "/impostazioni",
     etichetta: "Impostazioni",
@@ -68,7 +68,7 @@ export function Sidebar() {
       data-app-nav
       aria-label="Navigazione principale"
       className={
-        "no-print fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 flex-row items-center justify-center gap-4 px-3 py-3 " +
+        "no-print fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 flex-row items-center justify-center gap-4 border border-line bg-background backdrop-blur-sm rounded-[25px] px-3 py-3 " +
         "max-w-[calc(100vw-1.5rem)] "
       }
     >

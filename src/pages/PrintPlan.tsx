@@ -28,10 +28,11 @@ export default function PrintPlan() {
   // i dati ci sono, non solo al momento della stampa, così vale anche se il
   // trainer usa Ctrl+P al posto del pulsante.
   useEffect(() => {
-    if (!scheda.data) return;
+    if (!scheda.data || scheda.data.is_template) return;
     const precedente = document.title;
-    const cliente =
-      `${scheda.data.cliente.first_name} ${scheda.data.cliente.last_name}`.trim();
+    const cliente = scheda.data.cliente
+      ? `${scheda.data.cliente.first_name} ${scheda.data.cliente.last_name}`.trim()
+      : "";
     void import("@/lib/filename").then(({ nomeFileScheda }) => {
       document.title = nomeFileScheda(cliente, scheda.data!.title);
     });
@@ -63,10 +64,25 @@ export default function PrintPlan() {
       </div>
     );
   }
+  if (scheda.data.is_template) {
+    // §3.7bis: un template non ha un cliente, non ha senso stamparlo così
+    // com'è. Va prima applicato a un cliente (crea una scheda vera), e si
+    // stampa quella.
+    return (
+      <div className="p-8">
+        <Vuoto
+          titolo="Non si stampa un template"
+          descrizione='Applica prima il template a un cliente ("Applica a un cliente" nel builder): la scheda che ne nasce si stampa normalmente.'
+        />
+      </div>
+    );
+  }
 
   const s = scheda.data;
   const t = impostazioni.data;
-  const clienteNome = `${s.cliente.first_name} ${s.cliente.last_name}`.trim();
+  const clienteNome = s.cliente
+    ? `${s.cliente.first_name} ${s.cliente.last_name}`.trim()
+    : "";
   const totaleEsercizi = s.giorni.reduce(
     (somma, g) => somma + g.esercizi.length,
     0,

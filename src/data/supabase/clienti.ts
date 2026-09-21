@@ -6,7 +6,8 @@ import type { ClientiApi } from '../types'
 /** PostgREST restituisce i conteggi annidati come `[{ count: n }]`. */
 type ConConteggio = { workout_plans: { count: number }[] | null }
 
-const CAMPI = 'id, owner_id, first_name, last_name, email, phone, birth_date, notes, active, created_at, updated_at'
+const CAMPI =
+  'id, owner_id, first_name, last_name, email, phone, birth_date, height_cm, weight_kg, goal, notes, active, created_at, updated_at'
 
 export const clientiSupabase: ClientiApi = {
   async elenco(filtro) {

@@ -87,6 +87,9 @@ interface ConfirmDialogProps {
   etichettaConferma: string;
   distruttivo?: boolean;
   inCorso?: boolean;
+  /** Azione impossibile: resta solo il pulsante di chiusura (`etichettaAnnulla`). */
+  soloAnnulla?: boolean;
+  etichettaAnnulla?: string;
   onConferma: () => void;
   onAnnulla: () => void;
 }
@@ -98,6 +101,8 @@ export function ConfirmDialog({
   etichettaConferma,
   distruttivo = false,
   inCorso = false,
+  soloAnnulla = false,
+  etichettaAnnulla = "Annulla",
   onConferma,
   onAnnulla,
 }: ConfirmDialogProps) {
@@ -111,15 +116,17 @@ export function ConfirmDialog({
       azioni={
         <>
           <Button onClick={onAnnulla} disabled={inCorso}>
-            Annulla
+            {etichettaAnnulla}
           </Button>
-          <Button
-            variante={distruttivo ? "pericolo" : "primario"}
-            onClick={onConferma}
-            disabled={inCorso}
-          >
-            {inCorso ? "Attendi…" : etichettaConferma}
-          </Button>
+          {!soloAnnulla && (
+            <Button
+              variante={distruttivo ? "pericolo" : "primario"}
+              onClick={onConferma}
+              disabled={inCorso}
+            >
+              {inCorso ? "Attendi…" : etichettaConferma}
+            </Button>
+          )}
         </>
       }
     />

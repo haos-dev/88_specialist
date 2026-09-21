@@ -1,11 +1,18 @@
 import { supabase } from '@/lib/supabaseClient'
 import { oggi, spostaData, toDataISO } from '@/lib/dates'
-import type { GiornoEspanso, Scheda, SchedaCompleta, SchedaSintesi } from '@/types/domain'
+import type {
+  GiornoEspanso,
+  Scheda,
+  SchedaCompleta,
+  SchedaSintesi,
+  TemplateInput,
+  TemplateSintesi,
+} from '@/types/domain'
 import { ErroreDati, traduciErrore } from '../errors'
 import type { SchedeApi } from '../types'
 
 const CAMPI_SCHEDA =
-  'id, owner_id, client_id, title, start_date, end_date, notes, status, created_at, updated_at'
+  'id, owner_id, client_id, title, start_date, end_date, notes, status, is_template, created_at, updated_at'
 
 type RigaSintesi = Scheda & {
   clients: { first_name: string; last_name: string; active: boolean } | null
@@ -48,6 +55,7 @@ export const schedeSupabase: SchedeApi = {
         `${CAMPI_SCHEDA}, clients!inner(first_name, last_name, active), workout_days(count)`,
       )
       .eq('status', 'active')
+      .eq('is_template', false)
       .eq('clients.active', true)
       .not('end_date', 'is', null)
       .lte('end_date', limite)
@@ -237,5 +245,83 @@ export const schedeSupabase: SchedeApi = {
       p_posizioni: posizioni.map((p) => p.position),
     })
     if (error) throw traduciErrore(error, 'riordinare gli esercizi')
+  },
+
+  /* ------------------------------------------------------------- template */
+
+  async elencoTemplate() {
+    type RigaTemplate = {
+      id: string
+      title: string
+      notes: string | null
+      created_at: string
+      workout_days: { workout_day_exercises: { count: number }[] }[] | null
+    }
+
+    const { data, error } = await supabase()
+      .from('workout_plans')
+      .select('id, title, notes, created_at, workout_days(workout_day_exercises(count))')
+      .eq('is_template', true)
+      .order('title', { ascending: true })
+    if (error) throw traduciErrore(error, 'caricare i template')
+
+    return ((data ?? []) as unknown as RigaTemplate[]).map<TemplateSintesi>((riga) => ({
+      id: riga.id,
+      title: riga.title,
+      notes: riga.notes,
+      created_at: riga.created_at,
+      giorni_count: riga.workout_days?.length ?? 0,
+      esercizi_count: (riga.workout_days ?? []).reduce(
+        (somma, giorno) => somma + (giorno.workout_day_exercises?.[0]?.count ?? 0),
+        0,
+      ),
+    }))
+  },
+
+  async creaTemplate(input: TemplateInput) {
+    const { data, error } = await supabase()
+      .from('workout_plans')
+      .insert({ ...input, client_id: null, is_template: true })
+      .select(CAMPI_SCHEDA)
+      .single()
+    if (error) throw traduciErrore(error, 'creare il template')
+    return data as Scheda
+  },
+
+  async aggiornaTemplate(id, input: TemplateInput) {
+    const { data, error } = await supabase()
+      .from('workout_plans')
+      .update(input)
+      .eq('id', id)
+      .eq('is_template', true)
+      .select(CAMPI_SCHEDA)
+      .single()
+    if (error) throw traduciErrore(error, 'salvare il template')
+    return data as Scheda
+  },
+
+  async applicaTemplate(templateId, clientId, titolo, inizio, fine) {
+    // Gemella di `rinnova`: stessa copia profonda in un'unica transazione
+    // Postgres, ma verso un client_id di destinazione invece che lo stesso.
+    const { data, error } = await supabase().rpc('applica_template', {
+      p_template_id: templateId,
+      p_client_id: clientId,
+      p_titolo: titolo,
+      p_inizio: inizio,
+      p_fine: fine,
+    })
+    if (error) throw traduciErrore(error, 'applicare il template')
+    return data as unknown as Scheda
+  },
+
+  async eliminaTemplate(id) {
+    // Nessuna regola "solo se archiviato": un template non ha schede
+    // dipendenti da proteggere, a differenza di clienti e schede vere.
+    const { error } = await supabase()
+      .from('workout_plans')
+      .delete()
+      .eq('id', id)
+      .eq('is_template', true)
+    if (error) throw traduciErrore(error, 'eliminare il template')
   },
 }

@@ -58,15 +58,6 @@ export function useAggiornaEsercizio() {
   })
 }
 
-export function useArchiviaEsercizio() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, archiviato }: { id: string; archiviato: boolean }) =>
-      dati.esercizi.impostaArchiviato(id, archiviato),
-    onSuccess: () => invalidaEsercizi(client),
-  })
-}
-
 export function useEliminaEsercizio() {
   const client = useQueryClient()
   return useMutation({

@@ -53,8 +53,8 @@ sono costruite sotto, non cosa fanno per il trainer.)*
 
 ### 3.1 Gestione Clienti
 - Pagina "Clienti": elenco con ricerca live, filtro attivi/archiviati.
-- Pagina dedicata per cliente: anagrafica, note, elenco di tutti i piani di allenamento di
-  quel cliente.
+- Pagina dedicata per cliente: anagrafica, **altezza, peso, obiettivo** (tutti opzionali), note,
+  elenco di tutti i piani di allenamento di quel cliente.
 - CRUD completo: creazione, modifica, archiviazione/riattivazione, eliminazione definitiva
   (solo su clienti già archiviati, con conferma).
 
@@ -88,6 +88,24 @@ sono costruite sotto, non cosa fanno per il trainer.)*
   restano entrambe visibili/attive).
 - Eliminazione definitiva permessa solo su schede già archiviate, con conferma (stessa
   convenzione già usata per i Clienti).
+
+### 3.3bis Template di Allenamento
+- Il trainer può creare **template**: strutture di giorni/esercizi riutilizzabili, non legate a
+  nessun cliente, che vive nella pagina Esercizi (concettualmente è materiale di libreria, come
+  gli esercizi stessi — non appartiene a un cliente specifico più di quanto lo faccia un
+  esercizio).
+- Un template è modellato **come una Scheda con `client_id = null` e `is_template = true`**, non
+  come una tabella a sé: stesso builder (drag&drop giorni/esercizi), stesse policy RLS (già
+  basate su `owner_id`, non su un join a `clients`), zero duplicazione di logica. Non ha date né
+  stato attivo/archiviato: non è legato a un periodo.
+- **Applica a un cliente**: copia profonda del template (giorni ed esercizi) su un cliente
+  scelto, con titolo e date proprie — crea una Scheda vera e propria. Il template resta
+  invariato e riapplicabile quante volte serve.
+- **Eliminazione diretta**, senza la regola "solo se archiviato" che vale per Clienti e Schede:
+  un template non ha nulla che dipenda da lui (le schede già create da un'applicazione
+  precedente restano intatte, non referenziano il template).
+- Non si stampa un template direttamente (non ha un cliente): va prima applicato, poi si stampa
+  la scheda che ne nasce.
 
 ### 3.4 Esportazione PDF
 - Genera un PDF con branding del trainer (logo, colori), stesso contenuto già definito in v2
@@ -245,7 +263,11 @@ clients (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
   first_name text not null, last_name text not null,
-  email text, phone text, birth_date date, notes text,
+  email text, phone text, birth_date date,
+  height_cm numeric(5,1) check (height_cm is null or (height_cm between 50 and 250)),  -- §3.1
+  weight_kg numeric(5,1) check (weight_kg is null or (weight_kg between 20 and 400)),  -- §3.1
+  goal text,                                                                           -- §3.1
+  notes text,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()   -- [A4] aggiornato da trigger
@@ -266,13 +288,19 @@ exercises (
 workout_plans (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
-  client_id uuid not null references clients(id) on delete cascade,
+  -- [0007] null solo per i template (is_template = true): §3.3bis.
+  client_id uuid references clients(id) on delete cascade,
   title text not null, start_date date, end_date date, notes text,
   status text not null default 'active'
     check (status in ('active','archived')),      -- [A3]
+  is_template boolean not null default false,     -- [0007], §3.3bis
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),  -- [A4]
-  check (start_date is null or end_date is null or start_date <= end_date)
+  check (start_date is null or end_date is null or start_date <= end_date),
+  check (                                          -- [0007]
+    (is_template and client_id is null)
+    or (not is_template and client_id is not null)
+  )
 )
 
 workout_days (
@@ -363,6 +391,8 @@ restano la descrizione del prodotto; questa è il verbale di come è stata resa 
   durata, o da oggi se quella scheda è già scaduta; nessun suffisso automatico al titolo.
   Implementato come funzione Postgres `rinnova_scheda()`: farlo dal client sarebbero tre
   round-trip non transazionali, e un errore a metà lascerebbe una scheda senza esercizi.
+  **`applica_template()`** (§3.3bis) è la stessa idea verso un cliente di destinazione diverso
+  dall'origine (che per un template non ne ha uno).
 - **B2 — Riordino.** Il drag&drop su `day_order`/`order_index` riscrive le righe fratelle. Deve
   essere **una** scrittura, non N: funzioni `riordina_giorni()` / `riordina_esercizi()` che
   ricevono due array paralleli. L'app manda solo le posizioni davvero cambiate e aggiorna la UI

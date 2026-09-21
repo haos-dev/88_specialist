@@ -13,6 +13,7 @@ import type {
   Scheda,
   SchedaCompleta,
   SchedaSintesi,
+  TemplateSintesi,
 } from "@/types/domain";
 import { oggi, spostaData, toDataISO } from "@/lib/dates";
 import { ErroreDati } from "../errors";
@@ -265,7 +266,6 @@ const eserciziFixtures: EserciziApi = {
   async elenco(filtro) {
     const ricerca = filtro.ricerca.trim().toLocaleLowerCase("it");
     const filtrati = esercizi
-      .filter((e) => (filtro.includiArchiviati ? true : !e.archived))
       .filter((e) =>
         filtro.gruppoMuscolare
           ? e.muscle_group === filtro.gruppoMuscolare
@@ -317,15 +317,6 @@ const eserciziFixtures: EserciziApi = {
     return attesa({ ...esercizio });
   },
 
-  async impostaArchiviato(id, archiviato) {
-    const esercizio = esercizi.find((e) => e.id === id);
-    if (!esercizio)
-      throw new ErroreDati("sconosciuto", "Questo esercizio non esiste più.");
-    esercizio.archived = archiviato;
-    esercizio.updated_at = ora();
-    return attesa({ ...esercizio });
-  },
-
   async utilizzi(id) {
     return attesa(righe.filter((r) => r.exercise_id === id).length);
   },
@@ -335,7 +326,7 @@ const eserciziFixtures: EserciziApi = {
     if (righe.some((r) => r.exercise_id === id)) {
       throw new ErroreDati(
         "vincolo",
-        "Questo esercizio è usato in almeno una scheda. Archivialo invece di eliminarlo, così le schede esistenti restano leggibili.",
+        "Questo esercizio è usato in almeno una scheda. Toglilo dalle schede prima di eliminarlo, così restano leggibili.",
       );
     }
     const indice = esercizi.findIndex((e) => e.id === id);
@@ -367,8 +358,8 @@ function rimuoviSchedaInMemoria(planId: string) {
   if (indice >= 0) schede.splice(indice, 1);
 }
 
-function nomeCliente(clientId: string): string {
-  const cliente = clienti.find((c) => c.id === clientId);
+function nomeCliente(clientId: string | null): string {
+  const cliente = clientId ? clienti.find((c) => c.id === clientId) : undefined;
   return cliente ? `${cliente.first_name} ${cliente.last_name}` : "—";
 }
 
@@ -429,9 +420,11 @@ const schedeFixtures: SchedeApi = {
     const segnalate = schede
       .filter(
         (s) =>
+          !s.is_template &&
           s.status === "active" &&
           s.end_date !== null &&
           s.end_date <= limite &&
+          s.client_id !== null &&
           clientiAttivi.has(s.client_id),
       )
       .sort((a, b) => (a.end_date ?? "").localeCompare(b.end_date ?? ""))
@@ -442,17 +435,23 @@ const schedeFixtures: SchedeApi = {
   async dettaglio(id) {
     const scheda = schede.find((s) => s.id === id);
     if (!scheda) return attesa(null);
-    const cliente = clienti.find((c) => c.id === scheda.client_id);
+    const cliente = scheda.client_id
+      ? clienti.find((c) => c.id === scheda.client_id)
+      : undefined;
     const completa: SchedaCompleta = {
       ...scheda,
-      cliente: {
-        id: cliente?.id ?? scheda.client_id,
-        first_name: cliente?.first_name ?? "—",
-        last_name: cliente?.last_name ?? "",
-        email: cliente?.email ?? null,
-        phone: cliente?.phone ?? null,
-        active: cliente?.active ?? true,
-      },
+      // null per i template (§3.7bis): non hanno un cliente, non un
+      // placeholder "—" come per un cliente eliminato di una scheda vera.
+      cliente: scheda.is_template
+        ? null
+        : {
+            id: cliente?.id ?? scheda.client_id ?? "",
+            first_name: cliente?.first_name ?? "—",
+            last_name: cliente?.last_name ?? "",
+            email: cliente?.email ?? null,
+            phone: cliente?.phone ?? null,
+            active: cliente?.active ?? true,
+          },
       giorni: giorniEspansi(id),
     };
     return attesa(completa);
@@ -464,6 +463,7 @@ const schedeFixtures: SchedeApi = {
       owner_id: SESSIONE_SEED.userId,
       ...input,
       status: "active",
+      is_template: false,
       created_at: ora(),
       updated_at: ora(),
     };
@@ -609,6 +609,105 @@ const schedeFixtures: SchedeApi = {
       if (riga) riga.order_index = position;
     });
     await attesa(null, 40);
+  },
+
+  /* ------------------------------------------------------------- template */
+
+  async elencoTemplate() {
+    const elenco = schede
+      .filter((s) => s.is_template)
+      .sort((a, b) => a.title.localeCompare(b.title))
+      .map<TemplateSintesi>((s) => {
+        const giorniDelTemplate = giorni.filter((g) => g.plan_id === s.id);
+        const eserciziCount = righe.filter((r) =>
+          giorniDelTemplate.some((g) => g.id === r.day_id),
+        ).length;
+        return {
+          id: s.id,
+          title: s.title,
+          notes: s.notes,
+          giorni_count: giorniDelTemplate.length,
+          esercizi_count: eserciziCount,
+          created_at: s.created_at,
+        };
+      });
+    return attesa(elenco);
+  },
+
+  async creaTemplate(input) {
+    const nuovo: Scheda = {
+      id: uid("pl"),
+      owner_id: SESSIONE_SEED.userId,
+      client_id: null,
+      title: input.title,
+      start_date: null,
+      end_date: null,
+      notes: input.notes,
+      status: "active",
+      is_template: true,
+      created_at: ora(),
+      updated_at: ora(),
+    };
+    schede.push(nuovo);
+    return attesa(nuovo);
+  },
+
+  async aggiornaTemplate(id, input) {
+    const template = schede.find((s) => s.id === id && s.is_template);
+    if (!template)
+      throw new ErroreDati("sconosciuto", "Questo template non esiste più.");
+    Object.assign(template, input, { updated_at: ora() });
+    return attesa({ ...template });
+  },
+
+  async applicaTemplate(templateId, clientId, titolo, inizio, fine) {
+    const template = schede.find((s) => s.id === templateId && s.is_template);
+    if (!template)
+      throw new ErroreDati("sconosciuto", "Questo template non esiste più.");
+    const cliente = clienti.find((c) => c.id === clientId);
+    if (!cliente)
+      throw new ErroreDati("sconosciuto", "Questo cliente non esiste più.");
+
+    const nuova: Scheda = {
+      id: uid("pl"),
+      owner_id: SESSIONE_SEED.userId,
+      client_id: clientId,
+      title: titolo,
+      start_date: inizio,
+      end_date: fine,
+      notes: template.notes,
+      status: "active",
+      is_template: false,
+      created_at: ora(),
+      updated_at: ora(),
+    };
+    schede.push(nuova);
+
+    // Stessa copia profonda di `rinnova` (audit B1), verso un cliente diverso.
+    duplicaStruttura(giorniEspansi(templateId)).giorni.forEach((giorno) => {
+      const dayId = uid("dy");
+      giorni.push({
+        id: dayId,
+        plan_id: nuova.id,
+        day_order: giorno.day_order,
+        day_name: giorno.day_name,
+      });
+      giorno.esercizi.forEach((riga) => {
+        righe.push({ id: uid("rw"), day_id: dayId, ...riga });
+      });
+    });
+
+    return attesa(nuova);
+  },
+
+  async eliminaTemplate(id) {
+    // Nessuna regola "solo se archiviato": un template non ha schede
+    // dipendenti da proteggere.
+    const template = schede.find((s) => s.id === id && s.is_template);
+    if (!template)
+      throw new ErroreDati("sconosciuto", "Questo template non esiste più.");
+    rimuoviSchedaInMemoria(id);
+    await attesa(null);
   },
 };
 

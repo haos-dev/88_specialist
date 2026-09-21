@@ -10,7 +10,7 @@ const Login = lazy(() => import('@/pages/Login'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Clients = lazy(() => import('@/pages/Clients'))
 const ClientDetail = lazy(() => import('@/pages/ClientDetail'))
-const Exercises = lazy(() => import('@/pages/Exercises'))
+const Templates = lazy(() => import('@/pages/Templates'))
 const WorkoutBuilder = lazy(() => import('@/pages/WorkoutBuilder'))
 const PrintPlan = lazy(() => import('@/pages/PrintPlan'))
 const Settings = lazy(() => import('@/pages/Settings'))
@@ -37,7 +37,7 @@ export function App() {
             <Route index element={<Dashboard />} />
             <Route path="clienti" element={<Clients />} />
             <Route path="clienti/:id" element={<ClientDetail />} />
-            <Route path="esercizi" element={<Exercises />} />
+            <Route path="templates" element={<Templates />} />
             <Route path="schede/:id" element={<WorkoutBuilder />} />
             <Route path="impostazioni" element={<Settings />} />
           </Route>

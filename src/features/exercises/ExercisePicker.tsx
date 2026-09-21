@@ -35,12 +35,10 @@ export function ExercisePicker({
   const elenco = useEsercizi({
     ricerca,
     gruppoMuscolare: gruppo || null,
-    includiArchiviati: false,
     pagina,
     perPagina: ESERCIZI_PER_PAGINA,
   })
 
-  useEffect(() => setPagina(0), [ricerca, gruppo])
   useEffect(() => {
     if (!aperto) {
       setRicerca('')
@@ -67,12 +65,18 @@ export function ExercisePicker({
           etichetta="Cerca un esercizio"
           placeholder="Cerca per nome"
           valore={ricerca}
-          onChange={setRicerca}
+          onChange={(v) => {
+            setRicerca(v)
+            setPagina(0)
+          }}
           className="w-full sm:max-w-64"
         />
         <Select
           value={gruppo}
-          onChange={(e) => setGruppo(e.target.value)}
+          onChange={(e) => {
+            setGruppo(e.target.value)
+            setPagina(0)
+          }}
           aria-label="Filtra per gruppo muscolare"
           className="sm:max-w-48"
         >
@@ -92,7 +96,7 @@ export function ExercisePicker({
       ) : righe.length === 0 ? (
         <Vuoto
           titolo="Nessun esercizio trovato"
-          descrizione="Cambia i filtri, oppure aggiungi l'esercizio alla libreria dalla pagina Esercizi."
+          descrizione="Cambia i filtri, oppure aggiungi l'esercizio alla libreria dalla pagina Templates (icona database)."
         />
       ) : (
         <ul className="divide-y divide-line border-t border-line">

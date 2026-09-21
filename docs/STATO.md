@@ -80,7 +80,8 @@ src/
   features/
     clients/                useClients.ts  ClientForm.tsx
     exercises/              useExercises.ts  ExerciseForm.tsx  ExercisePicker.tsx
-    plans/                  usePlans.ts  PlanForm.tsx  RenewDialog.tsx  PlanHeading.tsx
+    plans/                  usePlans.ts  PlanForm.tsx  TemplateForm.tsx  RenewDialog.tsx
+                            ApplyTemplateDialog.tsx  PlanHeading.tsx
                             DayCard.tsx  ExerciseRow.tsx  DragHandle.tsx
                             planExpiry.ts  renewPlan.ts  reorder.ts   ← logica pura, testata
     settings/               useSettings.ts
@@ -98,7 +99,8 @@ src/
     WorkoutBuilder  PrintPlan  Settings  NotFound
 
 supabase/
-  migrations/               0001_schema  0002_rls  0003_triggers_indexes  0004_functions
+  migrations/               0001_schema … 0007_client_metrics_and_templates (vedi §9.2 per l'elenco completo)
+  functions/calendar-feed/  Edge Function, feed .ics (§3.7)
   seed/seed-exercises.mjs   script locale, service_role key
 
 tests/                      planExpiry  renewPlan  reorder  dates  filename
@@ -112,19 +114,24 @@ tests/                      planExpiry  renewPlan  reorder  dates  filename
 ## 3. Schema database
 
 Otto tabelle: `clients`, `exercises`, `workout_plans`, `workout_days`, `workout_day_exercises`,
-`trainer_settings`, **`appointments`** *(§3.7, aggiunta senza passare da questo file — vedi nota
-sotto)*. Tutte con RLS attiva; tutte filtrate per `owner_id` tranne `exercises`, che è la
-libreria condivisa e ha una policy "tutto agli autenticati, niente agli anonimi".
+`trainer_settings`, `appointments`. Tutte con RLS attiva; tutte filtrate per `owner_id` tranne
+`exercises`, che è la libreria condivisa e ha una policy "tutto agli autenticati, niente agli
+anonimi".
 
 **Fonte di verità: `supabase/migrations/`.** PRD §7 è stato aggiornato per corrispondervi.
 Nessuna migrazione è stata ancora applicata: non esiste un database.
 
-> **Nota di processo (colmata ora)**: la tabella `appointments` (0005) e il componente
-> `AppointmentCalendar.tsx` in Dashboard erano stati costruiti senza aggiornare né questo file
-> né il PRD — li ho trovati scollati durante una revisione e li ho appena riallineati (PRD §3.7,
-> qui sotto). Se in futuro capita di nuovo con qualcos'altro: è proprio il segnale che questo
-> file dovrebbe intercettare, quindi vale la pena controllare periodicamente `git diff` dello
-> schema/dei componenti contro quello che questo file dichiara.
+**Due aggiunte non ancora nel database reale, solo in migrazioni scritte (0007)**:
+- `clients`: `height_cm`, `weight_kg`, `goal` (tutti opzionali, con check di range largo — vedi
+  PRD §3.1/§7).
+- `workout_plans`: `client_id` ora nullable, nuovo campo `is_template`, con un check che impone
+  "o è un template senza cliente, o è una scheda vera con un cliente" — mai a metà. Un template
+  è **una Scheda come le altre**, non una tabella a sé (PRD §3.3bis): stesso builder, stesse
+  policy RLS, stessi hook di riordino giorni/esercizi.
+
+> **Nota di processo**: a differenza del calendario (Fase 9bis), stavolta PRD e questo file sono
+> stati aggiornati **nella stessa sessione** in cui è stato scritto il codice, non dopo — è il
+> comportamento giusto, non un'eccezione da segnalare come le altre volte.
 
 Le migrazioni contengono anche funzioni Postgres chiamate dall'app via `rpc()`:
 
@@ -134,6 +141,7 @@ Le migrazioni contengono anche funzioni Postgres chiamate dall'app via `rpc()`:
 | `riordina_giorni(plan_id, ids[], posizioni[])` | Un solo UPDATE dopo un drag&drop, invece di N. |
 | `riordina_esercizi(day_id, ids[], posizioni[])` | Idem, e il vincolo su `day_id` rende impossibile spostare un esercizio in un altro giorno (PRD §3.3). |
 | `rigenera_token_calendario()` | Ruota `trainer_settings.calendar_feed_token` (PRD §3.7); gestisce anche il caso "la riga non esiste ancora" come A7. |
+| `applica_template(template_id, client_id, titolo, inizio, fine)` | Gemella di `rinnova_scheda`, ma verso un `client_id` di destinazione diverso dall'origine (0007, PRD §3.3bis). |
 
 Tutte `security invoker` più `revoke`/`grant` espliciti (solo `authenticated`): le policy RLS
 continuano ad applicarsi e nessuna è chiamabile da `anon`.
@@ -155,6 +163,7 @@ backend.
 | schede | `elencoPerCliente` `inScadenza` `dettaglio` `crea` `aggiorna` `impostaStato` `elimina` `rinnova` | `data/supabase/schede.ts` |
 | schede → giorni | `aggiungiGiorno` `rinominaGiorno` `eliminaGiorno` `riordinaGiorni` | idem |
 | schede → esercizi | `aggiungiEsercizio` `aggiornaEsercizio` `rimuoviEsercizio` `riordinaEsercizi` | idem |
+| schede → template | `elencoTemplate` `creaTemplate` `aggiornaTemplate` `applicaTemplate` `eliminaTemplate` | idem — stesso file, un template è una Scheda (PRD §3.3bis) |
 | impostazioni | `leggi` `salva` `rigeneraTokenCalendario` | `data/supabase/impostazioni.ts` |
 | appuntamenti | `elenco`(per mese) `crea` `elimina` | `data/supabase/appuntamenti.ts` |
 
@@ -177,14 +186,27 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
 - **Dashboard** — schede da rinnovare, ordinate dalla più scaduta alla più imminente, con badge
   che dice "scaduta da 3 giorni" / "scade tra 5 giorni"; **calendario mensile appuntamenti**
   (crea/elimina, cliente opzionale, navigazione tra i mesi).
-- **Clienti** — elenco con ricerca live e filtro attivi/archiviati/tutti, creazione, modifica,
-  archiviazione, riattivazione, eliminazione definitiva (solo se archiviato, con conferma).
-- **Dettaglio cliente** — anagrafica, note, elenco delle sue schede con stato e scadenza.
+- **Clienti** — griglia di card (non più tabella — restyling in `3f058fd`, non documentato a suo
+  tempo, colmato qui), ricerca attivabile con un toggle, filtro attivi/archiviati/tutti,
+  creazione, modifica, archiviazione, riattivazione, eliminazione definitiva (solo se
+  archiviato, con conferma). Anagrafica ora include **altezza, peso, obiettivo** (0007, tutti
+  opzionali).
+- **Dettaglio cliente** — layout a griglia responsive, azioni (modifica/archivia/elimina) con
+  icone, anagrafica e note in evidenza (altezza/peso/obiettivo mostrati solo se compilati),
+  elenco delle sue schede con stato e scadenza.
 - **Esercizi** — griglia paginata con ricerca e filtro per gruppo muscolare, CRUD completo, e il
   controllo "in uso in N schede" prima di eliminare, che propone l'archiviazione al suo posto.
+- **Template di allenamento** — sezione a fondo pagina Esercizi (0007, PRD §3.3bis): crea/
+  modifica/elimina un template (stesso builder di giorni/esercizi delle schede vere, senza date
+  né stato), "Applica a un cliente" (sceglie cliente + titolo + date, crea una scheda vera via
+  `applica_template`), eliminazione diretta senza il vincolo "solo se archiviato" (un template
+  non ha nulla che dipenda da lui). Non si stampa un template direttamente — `PrintPlan` mostra
+  un avviso e rimanda ad applicarlo prima.
 - **Builder schede** — giorni e esercizi trascinabili (mouse **e** tastiera), serie/ripetizioni/
   recupero modificabili in linea, aggiunta esercizi dalla libreria senza chiudere il dialog,
-  rinnova, archivia, elimina.
+  rinnova, archivia, elimina. **A doppio uso**: la stessa pagina costruisce anche un template
+  (client_id null): nasconde scadenza/Esporta/Rinnova/Archivia, mostra "Applica a un cliente" ed
+  eliminazione diretta al loro posto.
 - **Stampa** — anteprima in una scheda nuova, immagini attese prima di stampare, nome file
   proposto `Scheda - Mario Rossi - Ipertrofia — blocco 1`.
 - **Impostazioni** — intestazione, recapiti, soglia di preavviso, anteprima del logo, **link del
@@ -204,6 +226,13 @@ DTSTART/DTEND, piegatura righe): vive in una Edge Function Deno con import `npm:
 portata diretta di Vitest così com'è configurato oggi. Da valutare se vale la pena estrarre le
 funzioni pure di formattazione in un modulo testabile separatamente, prima o durante il wiring.
 
+⚠️ Stesso discorso per i template (0007): nessun test automatico dedicato. A differenza del
+calendario non manca per un limite tecnico — qui la logica nuova è quasi tutta CRUD/wiring
+(query Supabase, mutation React Query) più il riuso di `duplicaStruttura` già testata in
+`renewPlan.ts`/`tests/renewPlan.test.ts`. Segue la stessa convenzione già in uso nel progetto:
+solo i moduli di logica pura isolata (`dates`, `planExpiry`, `renewPlan`, `reorder`, `filename`)
+hanno un file di test dedicato; il wiring dati non lo ha mai avuto neanche per Rinnova/Riordino.
+
 ---
 
 ## 6. Roadmap
@@ -219,6 +248,7 @@ funzioni pure di formattazione in un modulo testabile separatamente, prima o dur
 - [x] Fase 9 — PWA (manifest, service worker, icone)
 - [x] Fase 9bis — Calendario appuntamenti + feed iCalendar *(non pianificata in origine, vedi
       nota §3; documentata ora, migrazione 0005+0006 non ancora applicata)*
+- [x] Fase 9ter — Campi corporei cliente + Template di allenamento *(0007, non ancora applicata)*
 - [ ] Fase 10 — **Deploy e wiring** → §9
 
 ---
@@ -311,6 +341,37 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
 - **A senso unico per scelta**: quanto inserito nell'app compare sul calendario del telefono, non
   il contrario. Un sync bidirezionale vorrebbe dire CalDAV, esplicitamente fuori scope (PRD §4).
 
+### Fase 9ter — Campi corporei cliente + Template di allenamento (completata)
+
+- **Clienti**: aggiunti `height_cm`, `weight_kg`, `goal` (tutti opzionali, con validazione sia
+  lato form — Zod, coerente con i check Postgres — sia database). Mostrati in `ClientForm` e in
+  `ClientDetail` (solo se compilati).
+- **Template**: decisione di modellazione — **non** una tabella nuova, ma `workout_plans` con
+  `client_id` nullable + `is_template boolean`, vincolata da un check ("o è un template senza
+  cliente, o è una scheda vera con un cliente"). Motivo: riusa integralmente RLS (già basate su
+  `owner_id`, non su un join a `clients`), builder giorni/esercizi, drag&drop — zero logica
+  duplicata per una struttura identica. `WorkoutBuilder.tsx` e `PrintPlan.tsx` resi "a doppio
+  uso" (branch su `is_template`); nuova funzione Postgres `applica_template` (gemella di
+  `rinnova_scheda`, verso un cliente di destinazione).
+- **File toccati/creati**: `supabase/migrations/0007_client_metrics_and_templates.sql` (nuovo);
+  `src/types/database.ts` (`ClientRow`, `WorkoutPlanRow`, RPC `applica_template`, `ConDefault`);
+  `src/types/domain.ts` (`ClienteInput`, `SchedaCompleta.cliente` nullable, `TemplateSintesi`,
+  `TemplateInput`); `src/data/types.ts` (`SchedeApi` + 5 metodi template); `src/data/supabase/
+  {clienti,schede}.ts`; `src/data/fixtures/{dati,index}.ts` (seed con 3 clienti con valori
+  corporei d'esempio + un template "Full body — 3 giorni" con 2 giorni/6 esercizi); nuovi
+  `src/features/plans/{TemplateForm,ApplyTemplateDialog}.tsx`; `src/features/plans/usePlans.ts`
+  (+5 hook, + chiave query `chiavi.schede.template`); `src/features/clients/ClientForm.tsx`;
+  `src/pages/{WorkoutBuilder,PrintPlan,ClientDetail,Exercises}.tsx`.
+- **Verificato**: `npx tsc -b`, `npx eslint .` (0 errori), `npx vitest run` (67 test, invariati —
+  vedi avviso in §5 sul perché non ne ho aggiunti) e `npm run build` tutti puliti dopo le
+  modifiche.
+- **Non fatto**: nessuna migrazione applicata (richiede il progetto Supabase reale di §9); nessun
+  modo di spostare un esercizio tra giorni diversi trascinandolo (fuori scope, deciso in fase di
+  audit del PRD).
+- **Regola volutamente diversa da Clienti/Schede**: un template si elimina direttamente, senza il
+  vincolo "solo se già archiviato" — non ha schede dipendenti da proteggere (le copie create con
+  "Applica a un cliente" non referenziano più il template una volta create).
+
 ---
 
 ## 9. Da fare da te (wiring)
@@ -344,6 +405,7 @@ supabase/migrations/0003_triggers_indexes.sql
 supabase/migrations/0004_functions.sql
 supabase/migrations/0005_appointments.sql
 supabase/migrations/0006_calendar_feed.sql
+supabase/migrations/0007_client_metrics_and_templates.sql
 ```
 
 Con la CLI: `npx supabase link --project-ref <ref>` e poi `npx supabase db push`.

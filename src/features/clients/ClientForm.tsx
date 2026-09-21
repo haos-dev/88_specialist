@@ -12,6 +12,17 @@ const opzionale = z
   .trim()
   .transform((v) => (v.length === 0 ? null : v))
 
+/** Come `opzionale`, ma per i campi corporei: stringa vuota → null, altrimenti un numero nel range del vincolo Postgres (0007). */
+function numeroOpzionale(min: number, max: number, messaggio: string) {
+  return z
+    .string()
+    .trim()
+    .transform((v) => (v.length === 0 ? null : Number(v)))
+    .refine((v) => v === null || (!Number.isNaN(v) && v >= min && v <= max), {
+      message: messaggio,
+    })
+}
+
 const schema = z.object({
   first_name: z.string().trim().min(1, 'Il nome serve per identificare il cliente.'),
   last_name: z.string().trim().min(1, 'Il cognome serve per identificare il cliente.'),
@@ -20,6 +31,9 @@ const schema = z.object({
   }),
   phone: opzionale,
   birth_date: opzionale,
+  height_cm: numeroOpzionale(50, 250, "L'altezza va tra 50 e 250 cm."),
+  weight_kg: numeroOpzionale(20, 400, 'Il peso va tra 20 e 400 kg.'),
+  goal: opzionale,
   notes: opzionale,
 })
 
@@ -52,6 +66,9 @@ export function ClientForm({ aperto, cliente, inCorso, onSalva, onChiudi }: Clie
       email: cliente?.email ?? '',
       phone: cliente?.phone ?? '',
       birth_date: cliente?.birth_date ?? '',
+      height_cm: cliente?.height_cm != null ? String(cliente.height_cm) : '',
+      weight_kg: cliente?.weight_kg != null ? String(cliente.weight_kg) : '',
+      goal: cliente?.goal ?? '',
       notes: cliente?.notes ?? '',
     },
   })
@@ -125,9 +142,44 @@ export function ClientForm({ aperto, cliente, inCorso, onSalva, onChiudi }: Clie
           {(props) => <Input {...props} {...register('birth_date')} type="date" className="sm:max-w-48" />}
         </Field>
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Altezza (cm)" errore={errors.height_cm?.message}>
+            {(props) => (
+              <Input
+                {...props}
+                {...register('height_cm')}
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min={50}
+                max={250}
+                aria-invalid={Boolean(errors.height_cm)}
+              />
+            )}
+          </Field>
+          <Field label="Peso (kg)" errore={errors.weight_kg?.message}>
+            {(props) => (
+              <Input
+                {...props}
+                {...register('weight_kg')}
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min={20}
+                max={400}
+                aria-invalid={Boolean(errors.weight_kg)}
+              />
+            )}
+          </Field>
+        </div>
+
+        <Field label="Obiettivo" errore={errors.goal?.message} aiuto="Es. ipertrofia, dimagrimento, una gara specifica.">
+          {(props) => <Input {...props} {...register('goal')} autoComplete="off" />}
+        </Field>
+
         <Field
           label="Note"
-          aiuto="Infortuni, limitazioni, obiettivi: quello che serve ricordare quando costruisci una scheda."
+          aiuto="Infortuni e limitazioni: quello che serve ricordare quando costruisci una scheda."
           errore={errors.notes?.message}
         >
           {(props) => <Textarea {...props} {...register('notes')} rows={4} />}
