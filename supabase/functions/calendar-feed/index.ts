@@ -76,7 +76,11 @@ function formattaDataOra(dataISO: string, oraISO: string): string {
   return `${data}T${ora}`;
 }
 
-function aggiungiMinuti(dataISO: string, oraISO: string, minuti: number): string {
+function aggiungiMinuti(
+  dataISO: string,
+  oraISO: string,
+  minuti: number,
+): string {
   const dataOra = new Date(`${dataISO}T${oraISO}`);
   dataOra.setMinutes(dataOra.getMinutes() + minuti);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -115,7 +119,7 @@ Deno.serve(async (req) => {
 
   const { data: impostazioni, error: erroreImpostazioni } = await admin
     .from("trainer_settings")
-    .select("owner_id, business_name")
+    .select("owner_id")
     .eq("calendar_feed_token", token)
     .maybeSingle();
 
@@ -149,7 +153,7 @@ Deno.serve(async (req) => {
     return rispostaTestoSemplice("Errore nel leggere gli appuntamenti.", 500);
   }
 
-  const nomeCalendario = impostazioni.business_name || "PT Manager";
+  const nomeCalendario = "PT Manager";
   const righe: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",

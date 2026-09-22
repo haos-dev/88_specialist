@@ -113,81 +113,98 @@ export default function ClientDetail() {
           </div>
 
           <div className="mt-6 space-y-3 border-t border-line pt-5 text-sm text-muted">
-            {c.email ? (
-              <p className="flex items-start gap-3 break-all">
-                <Mail
-                  aria-hidden="true"
-                  className="mt-0.5 shrink-0 text-accent"
-                  size={16}
-                />
-                {c.email}
-              </p>
-            ) : null}
-            {c.phone ? (
-              <p className="flex items-center gap-3">
-                <Phone
-                  aria-hidden="true"
-                  className="shrink-0 text-accent"
-                  size={16}
-                />
-                {c.phone}
-              </p>
-            ) : null}
-            {c.birth_date ? (
-              <p className="flex items-center gap-3">
-                <CalendarDays
-                  aria-hidden="true"
-                  className="shrink-0 text-accent"
-                  size={16}
-                />
-                Nato/a il {formatData(c.birth_date)}
-              </p>
-            ) : null}
-            {!c.email && !c.phone && !c.birth_date ? (
-              <p>Nessun contatto indicato</p>
-            ) : null}
+            <p className="flex items-start gap-3 break-all">
+              <Mail
+                aria-hidden="true"
+                className="mt-0.5 shrink-0 text-accent"
+                size={16}
+              />
+              {c.email ? (
+                <span>{c.email}</span>
+              ) : (
+                <span className="text-muted">Nessuna email</span>
+              )}
+            </p>
+
+            <p className="flex items-center gap-3">
+              <Phone
+                aria-hidden="true"
+                className="shrink-0 text-accent"
+                size={16}
+              />
+              {c.phone ? (
+                <span>{c.phone}</span>
+              ) : (
+                <span className="text-muted">Nessun contatto</span>
+              )}
+            </p>
+
+            <p className="flex items-center gap-3">
+              <CalendarDays
+                aria-hidden="true"
+                className="shrink-0 text-accent"
+                size={16}
+              />
+              {c.birth_date ? (
+                <span>{formatData(c.birth_date)}</span>
+              ) : (
+                <span className="text-muted">Nessuna data di nascita</span>
+              )}
+            </p>
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-2 border-t border-line pt-5">
             <div className="flex min-h-16 items-center rounded-[12px] border border-line px-3 py-3">
-              {c.height_cm != null || c.weight_kg != null ? (
-                <div className="flex items-center gap-3 text-sm font-semibold text-ink">
-                  <Ruler
-                    aria-hidden="true"
-                    className="shrink-0 text-accent"
-                    size={23}
-                  />
-                  {[
-                    c.height_cm != null ? `${c.height_cm} cm` : null,
-                    c.weight_kg != null ? `${c.weight_kg} kg` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </div>
-              ) : null}
+              <div className="flex items-center gap-3 text-sm font-semibold text-ink">
+                <Ruler
+                  aria-hidden="true"
+                  className="shrink-0 text-accent"
+                  size={23}
+                />
+                {c.height_cm != null || c.weight_kg != null ? (
+                  <span className="text-lg font-semibold text-ink">
+                    {[
+                      c.height_cm != null ? `${c.height_cm} cm` : null,
+                      c.weight_kg != null ? `${c.weight_kg} kg` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                ) : (
+                  <span className="text-lg font-semibold text-ink">
+                    Nessuna informazione
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex min-h-16 items-center rounded-[12px] border border-line px-3 py-3">
-              {c.goal ? (
-                <div className="flex items-center gap-3 text-sm font-semibold text-ink">
-                  <Target
-                    aria-hidden="true"
-                    className="shrink-0 text-accent"
-                    size={23}
-                  />
-                  {c.goal}
-                </div>
-              ) : null}
+              <div className="flex items-center gap-3 text-sm font-semibold text-ink">
+                <Target
+                  aria-hidden="true"
+                  className="shrink-0 text-accent"
+                  size={23}
+                />
+                {c.goal ? (
+                  <span className="text-lg font-semibold text-ink">
+                    {c.goal}
+                  </span>
+                ) : (
+                  <span className="text-lg font-semibold text-ink">
+                    Nessun obiettivo
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {c.notes ? (
-            <div className="mt-6 border-l-2 border-accent/60 pl-4">
-              <p className="text-xs font-medium text-muted">Note</p>
+          <div className="mt-6 border-l-2 border-accent/60 pl-4">
+            <p className="text-xs font-medium text-muted">Note</p>
+            {c.notes ? (
               <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink">
                 {c.notes}
               </p>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
           <div className="mt-6 flex items-center gap-2 border-t border-line pt-5">
             <div className="ml-auto flex items-center gap-2">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Plus, Trash } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import {
   SortableContext,
@@ -90,14 +91,6 @@ export function DayCard({
             "focus-visible:outline-2 focus-visible:outline-teal focus-visible:outline-offset-1"
           }
         />
-
-        <button
-          type="button"
-          onClick={onElimina}
-          className="no-print shrink-0 text-xs text-muted transition-colors hover:text-scaduta"
-        >
-          Elimina giorno
-        </button>
       </header>
 
       {giorno.esercizi.length === 0 ? (
@@ -122,14 +115,29 @@ export function DayCard({
         </SortableContext>
       )}
 
-      <Button
-        dimensione="sm"
-        variante="fantasma"
-        className="no-print mt-2"
-        onClick={onAggiungiEsercizio}
-      >
-        Aggiungi esercizio
-      </Button>
+      <div className="no-print mt-2 flex flex-wrap items-center justify-between gap-2 pt-2">
+        <Button
+          variante="fantasma"
+          aria-label="Aggiungi esercizio"
+          title="Aggiungi esercizio"
+          className="min-h-10 px-2.5"
+          onClick={onAggiungiEsercizio}
+        >
+          <Plus aria-hidden="true" size={16} />
+          Aggiungi esercizio
+        </Button>
+
+        <Button
+          variante="fantasma"
+          aria-label="Elimina giorno"
+          title="Elimina giorno"
+          className="min-h-10 px-2.5 text-scaduta hover:bg-scaduta-soft hover:text-scaduta"
+          onClick={onElimina}
+        >
+          <Trash aria-hidden="true" size={15} />
+          Elimina giorno
+        </Button>
+      </div>
     </section>
   );
 }

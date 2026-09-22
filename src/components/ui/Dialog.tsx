@@ -10,6 +10,7 @@ interface DialogProps {
   /** Pulsanti in fondo. Se assente il dialog ha solo "Chiudi". */
   azioni?: ReactNode;
   larghezza?: "sm" | "md" | "lg";
+  nascondiScrollbar?: boolean;
 }
 
 const LARGHEZZE = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-3xl" } as const;
@@ -27,6 +28,7 @@ export function Dialog({
   children,
   azioni,
   larghezza = "md",
+  nascondiScrollbar = false,
 }: DialogProps) {
   const riferimento = useRef<HTMLDialogElement>(null);
 
@@ -66,7 +68,9 @@ export function Dialog({
             )}
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div
+            className={`min-h-0 flex-1 overflow-y-auto px-5 py-4${nascondiScrollbar ? " scrollbar-hidden" : ""}`}
+          >
             {children}
           </div>
 

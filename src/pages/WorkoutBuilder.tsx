@@ -50,7 +50,18 @@ import {
 import { useSogliaReminder } from "@/features/settings/useSettings";
 import { messaggioErrore } from "@/data";
 import type { GiornoEspanso } from "@/types/domain";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  SquareArrowUp,
+  UserRoundArrowLeft,
+  Trash,
+  Pen,
+  RefreshCw,
+  ArchiveRestore,
+  Archive,
+  Plus,
+} from "lucide-react";
+import { BadgeScadenza } from "@/components/ui/Badge";
 
 export default function WorkoutBuilder() {
   const { id = "" } = useParams<{ id: string }>();
@@ -216,76 +227,120 @@ export default function WorkoutBuilder() {
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0 flex-1">
           <PlanHeading
-            clienteNome={clienteNome}
-            titolo={s.title}
+            clienteNome={isTemplate ? s.title : clienteNome}
             inizio={s.start_date}
             fine={s.end_date}
-            scadenza={scadenza}
-            archiviata={!isTemplate && archiviata}
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {!isTemplate && (
-            <Button
-              variante="primario"
-              onClick={() => window.open(`/schede/${s.id}/stampa`, "_blank", "noopener")}
-            >
-              Esporta
-            </Button>
-          )}
-          <Button onClick={() => setFormAperto(true)}>Modifica</Button>
-          {isTemplate ? (
-            <>
-              {/* §3.7bis: un template non ha nulla che dipenda da lui, quindi
-                  l'eliminazione è diretta — non serve la regola "solo se
-                  archiviato" che protegge clienti e schede vere. */}
+        <div className="flex flex-col items-end gap-3">
+          {!isTemplate && archiviata ? (
+            <span className="border border-line px-1.5 py-0.5 text-xs font-medium text-muted">
+              Archiviata
+            </span>
+          ) : scadenza ? (
+            <BadgeScadenza
+              stato={scadenza.stato}
+              giorniResidui={scadenza.giorniResidui}
+            />
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {!isTemplate && (
               <Button
                 variante="primario"
-                onClick={() => setApplicaAperto(true)}
-              >
-                Applica a un cliente
-              </Button>
-              <Button
-                variante="pericolo"
-                onClick={() => setConfermaEliminazione(true)}
-              >
-                Elimina
-              </Button>
-            </>
-          ) : (
-            <>
-              {/* PRD §3.3: Rinnova e Archivia sono indipendenti, non l'una dentro l'altra. */}
-              <Button onClick={() => setRinnovoAperto(true)}>Rinnova</Button>
-              <Button
+                aria-label="Esporta scheda"
+                title="Esporta scheda"
+                className="h-10 w-10 !p-0"
                 onClick={() =>
-                  cambiaStato.mutate(
-                    { id: s.id, stato: archiviata ? "active" : "archived" },
-                    {
-                      onSuccess: () =>
-                        toast.conferma(
-                          archiviata
-                            ? "Scheda riattivata."
-                            : "Scheda archiviata.",
-                        ),
-                      onError: erroreToast,
-                    },
-                  )
+                  window.open(`/schede/${s.id}/stampa`, "_blank", "noopener")
                 }
-                disabled={cambiaStato.isPending}
               >
-                {archiviata ? "Riattiva" : "Archivia"}
+                <SquareArrowUp aria-hidden="true" size={17} />
               </Button>
-              {archiviata && (
+            )}
+            <Button
+              aria-label="Modifica"
+              title="Modifica"
+              className="h-10 w-10 !p-0"
+              onClick={() => setFormAperto(true)}
+            >
+              <Pen aria-hidden="true" size={17} />
+            </Button>
+            {isTemplate ? (
+              <>
+                {/* §3.7bis: un template non ha nulla che dipenda da lui, quindi
+                  l'eliminazione è diretta — non serve la regola "solo se
+                  archiviato" che protegge clienti e schede vere. */}
+                <Button
+                  variante="primario"
+                  aria-label="Applica a un cliente"
+                  title="Applica a un cliente"
+                  className="h-10 w-10 !p-0"
+                  onClick={() => setApplicaAperto(true)}
+                >
+                  <UserRoundArrowLeft aria-hidden="true" size={17} />
+                </Button>
                 <Button
                   variante="pericolo"
+                  aria-label="Elimina"
+                  title="Elimina"
+                  className="h-10 w-10 !p-0"
                   onClick={() => setConfermaEliminazione(true)}
                 >
-                  Elimina
+                  <Trash aria-hidden="true" size={17} />
                 </Button>
-              )}
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                {/* PRD §3.3: Rinnova e Archivia sono indipendenti, non l'una dentro l'altra. */}
+                <Button
+                  aria-label="Rinnova"
+                  title="Rinnova"
+                  className="h-10 w-10 !p-0"
+                  onClick={() => setRinnovoAperto(true)}
+                >
+                  <RefreshCw aria-hidden="true" size={17} />
+                </Button>
+                <Button
+                  aria-label={archiviata ? "Riattiva" : "Archivia"}
+                  title={archiviata ? "Riattiva" : "Archivia"}
+                  className="h-10 w-10 !p-0"
+                  onClick={() =>
+                    cambiaStato.mutate(
+                      { id: s.id, stato: archiviata ? "active" : "archived" },
+                      {
+                        onSuccess: () =>
+                          toast.conferma(
+                            archiviata
+                              ? "Scheda riattivata."
+                              : "Scheda archiviata.",
+                          ),
+                        onError: erroreToast,
+                      },
+                    )
+                  }
+                  disabled={cambiaStato.isPending}
+                >
+                  {archiviata ? (
+                    <ArchiveRestore aria-hidden="true" size={17} />
+                  ) : (
+                    <Archive aria-hidden="true" size={17} />
+                  )}
+                </Button>
+                {archiviata && (
+                  <Button
+                    variante="pericolo"
+                    aria-label="Elimina"
+                    title="Elimina"
+                    className="h-10 w-10 !p-0"
+                    onClick={() => setConfermaEliminazione(true)}
+                  >
+                    <Trash aria-hidden="true" size={17} />
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -303,6 +358,9 @@ export default function WorkoutBuilder() {
             azione={
               <Button
                 variante="primario"
+                aria-label="Aggiungi giorno"
+                title="Aggiungi giorno"
+                className="h-10 px-3"
                 onClick={() =>
                   aggiungiGiorno.mutate("Giorno 1", {
                     onSuccess: () => toast.conferma("Giorno aggiunto."),
@@ -310,6 +368,7 @@ export default function WorkoutBuilder() {
                   })
                 }
               >
+                <Plus aria-hidden="true" size={19} />
                 Aggiungi giorno
               </Button>
             }
@@ -356,8 +415,12 @@ export default function WorkoutBuilder() {
         )}
 
         {s.giorni.length > 0 && (
-          <div className="border-t border-line pt-4">
+          <div className="no-print flex justify-center pt-5">
             <Button
+              variante="primario"
+              aria-label="Aggiungi giorno"
+              title="Aggiungi giorno"
+              className="min-h-12 px-5 text-base"
               onClick={() =>
                 aggiungiGiorno.mutate(`Giorno ${s.giorni.length + 1}`, {
                   onSuccess: () => toast.conferma("Giorno aggiunto."),
@@ -366,6 +429,7 @@ export default function WorkoutBuilder() {
               }
               disabled={aggiungiGiorno.isPending}
             >
+              <Plus aria-hidden="true" size={19} />
               Aggiungi giorno
             </Button>
           </div>

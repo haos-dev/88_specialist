@@ -17,7 +17,7 @@ import {
 } from "@/features/exercises/useExercises";
 import { messaggioErrore } from "@/data";
 import type { Esercizio } from "@/types/domain";
-import { FileEdit, FilePlus, X, Trash } from "lucide-react";
+import { FileEdit, FilePlus, Trash } from "lucide-react";
 
 interface ExerciseLibraryDialogProps {
   aperto: boolean;
@@ -80,23 +80,12 @@ export function ExerciseLibraryDialog({
         aperto={aperto}
         titolo="Libreria esercizi"
         larghezza="lg"
+        nascondiScrollbar
         onChiudi={onChiudi}
         azioni={
           <>
-            <Button
-              onClick={onChiudi}
-              aria-label="Chiudi"
-              title="Chiudi"
-            >
-              <X aria-hidden="true" size={19} strokeWidth={2.2} />
-            </Button>
-            <Button
-              variante="primario"
-              onClick={apriNuovo}
-              aria-label="Nuovo esercizio"
-              title="Nuovo esercizio"
-            >
-              <FilePlus aria-hidden="true" size={19} strokeWidth={2.2} />
+            <Button onClick={onChiudi} aria-label="Chiudi" title="Chiudi">
+              Fine
             </Button>
           </>
         }
@@ -122,6 +111,14 @@ export function ExerciseLibraryDialog({
               </option>
             ))}
           </Select>
+          <Button
+            variante="primario"
+            onClick={apriNuovo}
+            aria-label="Nuovo esercizio"
+            title="Nuovo esercizio"
+          >
+            <FilePlus aria-hidden="true" size={19} strokeWidth={2.2} />
+          </Button>
         </div>
 
         {elenco.isLoading ? (

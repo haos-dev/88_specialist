@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/Button";
 import { Caricamento, Errore, Vuoto } from "@/components/ui/Stato";
 import { PlanHeading } from "@/features/plans/PlanHeading";
 import { useScheda } from "@/features/plans/usePlans";
-import { useImpostazioni } from "@/features/settings/useSettings";
 import { stampaScheda } from "@/features/pdf/printSheet";
 import { formatDataEstesa } from "@/lib/dates";
 
@@ -19,10 +18,9 @@ import { formatDataEstesa } from "@/lib/dates";
 export default function PrintPlan() {
   const { id = "" } = useParams<{ id: string }>();
   const scheda = useScheda(id);
-  const impostazioni = useImpostazioni();
   const [inPreparazione, setInPreparazione] = useState(false);
 
-  const pronto = Boolean(scheda.data) && !impostazioni.isLoading;
+  const pronto = Boolean(scheda.data);
 
   // Il titolo della pagina è anche il nome file proposto: lo scriviamo appena
   // i dati ci sono, non solo al momento della stampa, così vale anche se il
@@ -79,7 +77,6 @@ export default function PrintPlan() {
   }
 
   const s = scheda.data;
-  const t = impostazioni.data;
   const clienteNome = s.cliente
     ? `${s.cliente.first_name} ${s.cliente.last_name}`.trim()
     : "";
@@ -116,33 +113,9 @@ export default function PrintPlan() {
         </div>
       </div>
 
-      <article className="print-surface print-sheet mx-auto max-w-[210mm] bg-surface px-8 py-10 sm:px-12">
-        {/* Intestazione del trainer (PRD §3.5): logo e recapiti sul foglio. */}
-        {t && (t.business_name || t.logo_url) && (
-          <header className="mb-8 flex items-start justify-between gap-6 border-b border-line pb-4">
-            <div>
-              {t.business_name && (
-                <p className="display-tight text-lg text-ink">
-                  {t.business_name}
-                </p>
-              )}
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                {[t.address, t.phone, t.email].filter(Boolean).join(" · ")}
-              </p>
-            </div>
-            {t.logo_url && (
-              <img
-                src={t.logo_url}
-                alt=""
-                className="h-14 w-auto max-w-40 object-contain"
-              />
-            )}
-          </header>
-        )}
-
+      <article className="print-surface print-sheet mx-auto max-w-[210mm] bg-surface px-8 py-10 text-ink sm:px-12">
         <PlanHeading
           clienteNome={clienteNome}
-          titolo={s.title}
           inizio={s.start_date}
           fine={s.end_date}
         />

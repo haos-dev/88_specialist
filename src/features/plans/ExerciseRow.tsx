@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
+import { Minus } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/cn";
 import type {
@@ -74,7 +75,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
       data-print-row
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "flex items-center gap-2 border-b border-line py-1.5",
+        "flex flex-wrap items-center gap-2 border-b border-line py-1.5",
         isDragging &&
           "relative z-10 bg-surface opacity-90 shadow-dialog [will-change:transform]",
       )}
@@ -100,7 +101,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
         />
       )}
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-40">
         <p className="truncate text-sm font-medium" title={riga.esercizio.name}>
           {riga.esercizio.name}
         </p>
@@ -109,7 +110,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
         </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         <label className="sr-only" htmlFor={`sets-${riga.id}`}>
           Serie per {riga.esercizio.name}
         </label>
@@ -119,7 +120,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
           onChange={(e) => setBozza((b) => ({ ...b, sets: e.target.value }))}
           onBlur={salva}
           placeholder="serie"
-          className={cn(CAMPO, "w-11 text-right")}
+          className={cn(CAMPO, "w-9 text-right")}
         />
         <span aria-hidden="true" className="text-xs text-muted">
           ×
@@ -133,7 +134,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
           onChange={(e) => setBozza((b) => ({ ...b, reps: e.target.value }))}
           onBlur={salva}
           placeholder="rip"
-          className={cn(CAMPO, "w-14")}
+          className={cn(CAMPO, "w-12")}
         />
         <label className="sr-only" htmlFor={`rest-${riga.id}`}>
           Recupero in secondi per {riga.esercizio.name}
@@ -150,7 +151,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
           onBlur={salva}
           inputMode="numeric"
           placeholder="rec"
-          className={cn(CAMPO, "w-12 text-right")}
+          className={cn(CAMPO, "w-10 text-right")}
         />
         <span aria-hidden="true" className="w-3 text-xs text-muted">
           {bozza.rest ? "″" : ""}
@@ -159,11 +160,12 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
 
       <button
         type="button"
-        onClick={onRimuovi}
         aria-label={`Togli ${riga.esercizio.name} dal giorno`}
-        className="no-print shrink-0 px-1 text-xs text-muted transition-colors hover:text-scaduta"
+        title="Togli dal giorno"
+        className="no-print shrink-0 rounded-[10px] p-1 text-scaduta transition-colors hover:text-scaduta focus-visible:text-scaduta"
+        onClick={onRimuovi}
       >
-        Togli
+        <Minus aria-hidden="true" size={16} />
       </button>
     </li>
   );

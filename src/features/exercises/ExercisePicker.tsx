@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/Button'
-import { Dialog } from '@/components/ui/Dialog'
-import { Select } from '@/components/ui/Field'
-import { SearchInput } from '@/components/ui/SearchInput'
-import { Caricamento, Errore, Vuoto } from '@/components/ui/Stato'
-import { ESERCIZI_PER_PAGINA, useEsercizi, useGruppiMuscolari } from './useExercises'
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
+import { Select } from "@/components/ui/Field";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { Caricamento, Errore, Vuoto } from "@/components/ui/Stato";
+import {
+  ESERCIZI_PER_PAGINA,
+  useEsercizi,
+  useGruppiMuscolari,
+} from "./useExercises";
+import { Plus } from "lucide-react";
 
 interface ExercisePickerProps {
-  aperto: boolean
+  aperto: boolean;
   /** Nome del giorno a cui si sta aggiungendo, per non perdere il contesto. */
-  nomeGiorno: string
-  inCorso?: boolean
-  onScegli: (exerciseId: string) => void
-  onChiudi: () => void
+  nomeGiorno: string;
+  inCorso?: boolean;
+  onScegli: (exerciseId: string) => void;
+  onChiudi: () => void;
 }
 
 /**
@@ -22,43 +27,44 @@ interface ExercisePickerProps {
  */
 export function ExercisePicker({
   aperto,
-  nomeGiorno,
+  nomeGiorno: _nomeGiorno,
   inCorso,
   onScegli,
   onChiudi,
 }: ExercisePickerProps) {
-  const [ricerca, setRicerca] = useState('')
-  const [gruppo, setGruppo] = useState('')
-  const [pagina, setPagina] = useState(0)
+  const [ricerca, setRicerca] = useState("");
+  const [gruppo, setGruppo] = useState("");
+  const [pagina, setPagina] = useState(0);
 
-  const gruppi = useGruppiMuscolari()
+  const gruppi = useGruppiMuscolari();
   const elenco = useEsercizi({
     ricerca,
     gruppoMuscolare: gruppo || null,
     pagina,
     perPagina: ESERCIZI_PER_PAGINA,
-  })
+  });
 
   useEffect(() => {
     if (!aperto) {
-      setRicerca('')
-      setGruppo('')
-      setPagina(0)
+      setRicerca("");
+      setGruppo("");
+      setPagina(0);
     }
-  }, [aperto])
+  }, [aperto]);
 
-  const righe = elenco.data?.righe ?? []
-  const totale = elenco.data?.totale ?? 0
-  const pagine = Math.max(1, Math.ceil(totale / ESERCIZI_PER_PAGINA))
+  const righe = elenco.data?.righe ?? [];
+  const totale = elenco.data?.totale ?? 0;
+  const pagine = Math.max(1, Math.ceil(totale / ESERCIZI_PER_PAGINA));
 
   return (
     <Dialog
       aperto={aperto}
       titolo="Aggiungi esercizio"
-      descrizione={`Finisce in fondo a "${nomeGiorno}". Puoi aggiungerne più di uno prima di chiudere.`}
+      descrizione=""
       onChiudi={onChiudi}
       larghezza="lg"
-      azioni={<Button onClick={onChiudi}>Ho finito</Button>}
+      nascondiScrollbar
+      azioni={<Button onClick={onChiudi}>Fine</Button>}
     >
       <div className="mb-4 flex flex-wrap gap-3">
         <SearchInput
@@ -66,16 +72,16 @@ export function ExercisePicker({
           placeholder="Cerca per nome"
           valore={ricerca}
           onChange={(v) => {
-            setRicerca(v)
-            setPagina(0)
+            setRicerca(v);
+            setPagina(0);
           }}
           className="w-full sm:max-w-64"
         />
         <Select
           value={gruppo}
           onChange={(e) => {
-            setGruppo(e.target.value)
-            setPagina(0)
+            setGruppo(e.target.value);
+            setPagina(0);
           }}
           aria-label="Filtra per gruppo muscolare"
           className="sm:max-w-48"
@@ -110,11 +116,16 @@ export function ExercisePicker({
                   className="h-10 w-14 shrink-0 border border-line object-cover"
                 />
               ) : (
-                <div className="h-10 w-14 shrink-0 border border-dashed border-line" aria-hidden="true" />
+                <div
+                  className="h-10 w-14 shrink-0 border border-dashed border-line"
+                  aria-hidden="true"
+                />
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{esercizio.name}</p>
-                <p className="text-xs text-muted">{esercizio.muscle_group ?? '—'}</p>
+                <p className="text-xs text-muted">
+                  {esercizio.muscle_group ?? "—"}
+                </p>
               </div>
               <Button
                 dimensione="sm"
@@ -122,7 +133,7 @@ export function ExercisePicker({
                 disabled={inCorso}
                 onClick={() => onScegli(esercizio.id)}
               >
-                Aggiungi
+                <Plus aria-hidden="true" size={16} />
               </Button>
             </li>
           ))}
@@ -131,7 +142,11 @@ export function ExercisePicker({
 
       {pagine > 1 && (
         <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
-          <Button dimensione="sm" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>
+          <Button
+            dimensione="sm"
+            disabled={pagina === 0}
+            onClick={() => setPagina((p) => p - 1)}
+          >
             Precedenti
           </Button>
           <p className="nums text-xs text-muted">
@@ -147,5 +162,5 @@ export function ExercisePicker({
         </div>
       )}
     </Dialog>
-  )
+  );
 }

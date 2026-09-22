@@ -90,6 +90,48 @@ function uid(prefisso: string): string {
   return `${prefisso}-${contatore}`;
 }
 
+const CHIAVE_STATO = "ptm.fixtures.stato";
+
+function ripristinaStato() {
+  try {
+    const grezzo = localStorage.getItem(CHIAVE_STATO);
+    if (!grezzo) return;
+    const stato = JSON.parse(grezzo);
+    clienti.splice(0, clienti.length, ...stato.clienti);
+    esercizi.splice(0, esercizi.length, ...stato.esercizi);
+    schede.splice(0, schede.length, ...stato.schede);
+    giorni.splice(0, giorni.length, ...stato.giorni);
+    righe.splice(0, righe.length, ...stato.righe);
+    appuntamenti.splice(0, appuntamenti.length, ...stato.appuntamenti);
+    impostazioni = stato.impostazioni;
+    contatore = stato.contatore;
+  } catch {
+    localStorage.removeItem(CHIAVE_STATO);
+  }
+}
+
+function salvaStato() {
+  try {
+    localStorage.setItem(
+      CHIAVE_STATO,
+      JSON.stringify({
+        clienti,
+        esercizi,
+        schede,
+        giorni,
+        righe,
+        appuntamenti,
+        impostazioni,
+        contatore,
+      }),
+    );
+  } catch {
+    return;
+  }
+}
+
+ripristinaStato();
+
 const appuntamentiFixtures: AppuntamentiApi = {
   async elenco(mese) {
     return attesa(
@@ -120,6 +162,7 @@ const appuntamentiFixtures: AppuntamentiApi = {
 
 /** Piccola latenza artificiale: gli stati di caricamento vanno visti almeno una volta. */
 function attesa<T>(valore: T, ms = 120): Promise<T> {
+  salvaStato();
   return new Promise((resolve) => setTimeout(() => resolve(valore), ms));
 }
 

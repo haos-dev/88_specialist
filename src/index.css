@@ -75,6 +75,14 @@
     display: none;
   }
 
+  .scrollbar-hidden {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
   body {
     background-color: var(--color-paper);
     color: var(--color-ink);

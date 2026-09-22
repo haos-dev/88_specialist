@@ -87,13 +87,6 @@ export type WorkoutDayExerciseRow = {
 
 export type TrainerSettingsRow = {
   owner_id: string;
-  business_name: string | null;
-  logo_url: string | null;
-  primary_color: string | null;
-  secondary_color: string | null;
-  address: string | null;
-  phone: string | null;
-  email: string | null;
   reminder_days_before: number | null;
   calendar_feed_token: string | null;
 };

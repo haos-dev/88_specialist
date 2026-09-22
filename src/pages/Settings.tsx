@@ -1,9 +1,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Field, Input, Textarea } from "@/components/ui/Field";
+import { Field, Input } from "@/components/ui/Field";
 import { Caricamento, Errore } from "@/components/ui/Stato";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -24,33 +23,7 @@ function urlFeedCalendario(token: string): string {
   return `${SUPABASE_URL_FEED}/functions/v1/calendar-feed?token=${token}`;
 }
 
-const opzionale = z
-  .string()
-  .trim()
-  .transform((v) => (v.length === 0 ? null : v));
-
-const colore = opzionale.refine(
-  (v) => v === null || /^#[0-9a-fA-F]{6}$/.test(v),
-  {
-    message: "Serve un colore in formato #RRGGBB.",
-  },
-);
-
 const schema = z.object({
-  business_name: opzionale,
-  logo_url: opzionale.refine((v) => v === null || /^https?:\/\//.test(v), {
-    message: "Serve un indirizzo che inizi con http:// o https://",
-  }),
-  primary_color: colore,
-  secondary_color: colore,
-  address: opzionale,
-  phone: opzionale,
-  email: opzionale.refine(
-    (v) => v === null || z.string().email().safeParse(v).success,
-    {
-      message: "Questo non è un indirizzo email valido.",
-    },
-  ),
   reminder_days_before: z.coerce
     .number({ message: "Inserisci un numero di giorni." })
     .int("Inserisci un numero intero di giorni.")
@@ -66,35 +39,19 @@ export default function Settings() {
   const salva = useSalvaImpostazioni();
   const rigeneraToken = useRigeneraTokenCalendario();
   const toast = useToast();
-  const { esci, sessione } = useAuth();
+  const { esci } = useAuth();
 
   const {
     register,
-    handleSubmit,
-    watch,
-    formState: { errors, isDirty },
+    trigger,
+    formState: { errors },
   } = useForm<Campi, unknown, CampiPuliti>({
     resolver: zodResolver(schema),
+    mode: "onChange",
     values: {
-      business_name: impostazioni.data?.business_name ?? "",
-      logo_url: impostazioni.data?.logo_url ?? "",
-      primary_color: impostazioni.data?.primary_color ?? "",
-      secondary_color: impostazioni.data?.secondary_color ?? "",
-      address: impostazioni.data?.address ?? "",
-      phone: impostazioni.data?.phone ?? "",
-      email: impostazioni.data?.email ?? "",
       reminder_days_before:
         impostazioni.data?.reminder_days_before ?? SOGLIA_REMINDER_DEFAULT,
     },
-  });
-
-  const logo = watch("logo_url");
-
-  const invia = handleSubmit((campi) => {
-    salva.mutate(campi as ImpostazioniInput, {
-      onSuccess: () => toast.conferma("Impostazioni salvate."),
-      onError: (errore) => toast.errore(messaggioErrore(errore)),
-    });
   });
 
   if (impostazioni.isLoading) return <Caricamento />;
@@ -108,176 +65,69 @@ export default function Settings() {
   }
 
   return (
-    <>
-      <PageHeader
-        titolo="Impostazioni"
-        descrizione="Come ti presenti sulle schede stampate, e quanto preavviso vuoi sulle scadenze."
-      />
+    <div className="mx-auto w-full max-w-xl">
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-5 border-b border-line pb-5">
+        <div>
+          <h1 className="display text-4xl leading-none text-ink sm:text-5xl">
+            Settings
+          </h1>
+        </div>
+      </header>
 
-      <form
-        onSubmit={invia}
-        className="flex max-w-2xl flex-col gap-8"
-        noValidate
-      >
+      <div className="flex flex-col gap-8">
         <section className="flex flex-col gap-4">
-          <h2 className="display-tight border-b border-line pb-1.5 text-lg">
-            Intestazione delle schede
-          </h2>
-
-          <Field
-            label="Nome dell'attività"
-            errore={errors.business_name?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                {...register("business_name")}
-                placeholder="Es. Studio Forma"
-              />
-            )}
-          </Field>
-
-          <Field
-            label="Logo"
-            aiuto="Indirizzo pubblico dell'immagine. Compare in alto a destra sul foglio stampato."
-            errore={errors.logo_url?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                {...register("logo_url")}
-                type="url"
-                placeholder="https://…"
-                aria-invalid={Boolean(errors.logo_url)}
-              />
-            )}
-          </Field>
-
-          {logo && !errors.logo_url && (
-            <img
-              src={logo}
-              alt=""
-              className="h-16 w-auto max-w-48 border border-line object-contain p-1"
-              onError={(e) => {
-                e.currentTarget.style.visibility = "hidden";
-              }}
-            />
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Colore principale"
-              errore={errors.primary_color?.message}
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  {...register("primary_color")}
-                  placeholder="#0E5C52"
-                  aria-invalid={Boolean(errors.primary_color)}
-                />
-              )}
-            </Field>
-            <Field
-              label="Colore secondario"
-              errore={errors.secondary_color?.message}
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  {...register("secondary_color")}
-                  placeholder="#2E9C8A"
-                  aria-invalid={Boolean(errors.secondary_color)}
-                />
-              )}
-            </Field>
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-4">
-          <h2 className="display-tight border-b border-line pb-1.5 text-lg">
-            Recapiti
-          </h2>
-
-          <Field label="Indirizzo" errore={errors.address?.message}>
-            {(props) => (
-              <Textarea {...props} {...register("address")} rows={2} />
-            )}
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Telefono" errore={errors.phone?.message}>
-              {(props) => (
-                <Input {...props} {...register("phone")} type="tel" />
-              )}
-            </Field>
-            <Field label="Email" errore={errors.email?.message}>
-              {(props) => (
-                <Input
-                  {...props}
-                  {...register("email")}
-                  type="email"
-                  aria-invalid={Boolean(errors.email)}
-                />
-              )}
-            </Field>
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-4">
-          <h2 className="display-tight border-b border-line pb-1.5 text-lg">
-            Promemoria scadenze
-          </h2>
+          <h2 className="display-tight text-lg">Scadenze</h2>
 
           <Field
             label="Giorni di preavviso"
-            aiuto="Una scheda compare fra quelle da rinnovare quando mancano meno di questi giorni alla sua data di fine."
+            aiuto="Le schede compaiono nel promemoria quando mancano meno di questi giorni alla scadenza."
             errore={errors.reminder_days_before?.message}
           >
             {(props) => (
               <Input
                 {...props}
-                {...register("reminder_days_before")}
+                {...register("reminder_days_before", {
+                  onChange: async (event) => {
+                    const valido = schema.safeParse({
+                      reminder_days_before: event.target.value,
+                    });
+                    await trigger("reminder_days_before");
+                    if (!valido.success) return;
+                    salva.mutate(
+                      {
+                        reminder_days_before: valido.data.reminder_days_before,
+                      } as ImpostazioniInput,
+                      {
+                        onError: (errore) =>
+                          toast.errore(messaggioErrore(errore)),
+                      },
+                    );
+                  },
+                })}
                 type="number"
                 min={0}
                 max={365}
-                className="sm:max-w-28"
+                className="w-20"
                 aria-invalid={Boolean(errors.reminder_days_before)}
               />
             )}
           </Field>
         </section>
+      </div>
 
-        <div className="flex items-center gap-3 border-t border-line pt-5">
-          <Button
-            type="submit"
-            variante="primario"
-            disabled={salva.isPending || !isDirty}
-          >
-            {salva.isPending ? "Salvataggio…" : "Salva impostazioni"}
-          </Button>
-          {!isDirty && !salva.isPending && (
-            <span className="text-sm text-muted">
-              Nessuna modifica da salvare.
-            </span>
-          )}
-        </div>
-      </form>
-
-      <section className="mt-12 max-w-2xl border-t border-line pt-5">
-        <h2 className="display-tight text-lg">Feed calendario</h2>
+      <section className="mt-12 border-t border-line pt-5">
+        <h2 className="display-tight text-lg">Calendario</h2>
         <p className="mt-1 text-sm text-muted">
           Iscriviti a questo indirizzo da Apple Calendar, Google Calendar o
-          Outlook (&quot;aggiungi calendario da URL&quot;) per vedere i tuoi
-          appuntamenti anche sul telefono. Funziona in un verso solo: quello
-          che inserisci qui compare lì, non il contrario. L&apos;app di
-          calendario ricontrolla periodicamente da sola — di solito entro
-          poche ore, non è immediato.
+          Outlook per vedere gli appuntamenti anche sul telefono. Il feed è a
+          senso unico: gli appuntamenti inseriti qui compaiono nel calendario,
+          ma non il contrario.
         </p>
 
         {impostazioni.data?.calendar_feed_token ? (
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
             <Input
+              aria-label="Link del feed calendario"
               readOnly
               value={urlFeedCalendario(impostazioni.data.calendar_feed_token)}
               onFocus={(e) => e.currentTarget.select()}
@@ -312,8 +162,7 @@ export default function Settings() {
                     return;
                   rigeneraToken.mutate(undefined, {
                     onSuccess: () => toast.conferma("Nuovo link generato."),
-                    onError: (errore) =>
-                      toast.errore(messaggioErrore(errore)),
+                    onError: (errore) => toast.errore(messaggioErrore(errore)),
                   });
                 }}
                 disabled={rigeneraToken.isPending}
@@ -338,15 +187,17 @@ export default function Settings() {
         )}
       </section>
 
-      <section className="mt-12 max-w-2xl border-t border-line pt-5">
-        <h2 className="display-tight text-lg">Accesso</h2>
-        <p className="mt-1 text-sm text-muted">
-          Sei entrato come {sessione?.email}.
-        </p>
-        <Button className="mt-3" onClick={() => void esci()}>
-          Esci
-        </Button>
+      <section className="mt-12 border-t border-line pt-5">
+        <div className="flex justify-end">
+          <Button
+            variante="fantasma"
+            className="shrink-0 border border-line text-scaduta hover:bg-scaduta-soft hover:text-scaduta"
+            onClick={() => void esci()}
+          >
+            Logout
+          </Button>
+        </div>
       </section>
-    </>
+    </div>
   );
 }

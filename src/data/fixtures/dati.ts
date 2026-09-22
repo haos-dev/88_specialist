@@ -531,13 +531,6 @@ SEMI_GIORNI.forEach((seme, indice) => {
 
 export const IMPOSTAZIONI_SEED: Impostazioni = {
   owner_id: OWNER,
-  business_name: "Studio Forma",
-  logo_url: null,
-  primary_color: "#0E5C52",
-  secondary_color: "#2E9C8A",
-  address: "Via dei Mille 14, 20121 Milano",
-  phone: "02 1234567",
-  email: "info@studioforma.it",
   reminder_days_before: 7,
   calendar_feed_token: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
 };

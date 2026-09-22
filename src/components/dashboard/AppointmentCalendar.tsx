@@ -5,8 +5,10 @@ import {
   endOfMonth,
   endOfWeek,
   format,
+  isBefore,
   isSameDay,
   isSameMonth,
+  startOfDay,
   startOfMonth,
   startOfWeek,
   subMonths,
@@ -60,7 +62,7 @@ export function AppointmentCalendar() {
 
   const vaiAlMese = (nuovoMese: Date) => {
     setMese(startOfMonth(nuovoMese));
-    setGiornoSelezionato(startOfMonth(nuovoMese));
+    setGiornoSelezionato(nuovoMese);
   };
 
   const salva = (input: AppuntamentoInput) => {
@@ -142,6 +144,7 @@ export function AppointmentCalendar() {
             ))}
             {giorni.map((giorno) => {
               const iso = toDataISO(giorno);
+              const disabilitato = isBefore(giorno, startOfDay(oggi()));
               const eventi = (appuntamenti.data ?? []).filter(
                 (appuntamento) => appuntamento.appointment_date === iso,
               );
@@ -150,8 +153,9 @@ export function AppointmentCalendar() {
                 <button
                   type="button"
                   key={iso}
+                  disabled={disabilitato}
                   onClick={() => setGiornoSelezionato(giorno)}
-                  className={`min-h-20 border-b border-r border-line p-2 text-left transition-colors hover:bg-accent/10 ${!isSameMonth(giorno, mese) ? "text-muted/40" : "text-ink"} ${selezionato ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}
+                  className={`min-h-20 border-b border-r border-line p-2 text-left transition-colors hover:bg-accent/10 ${!isSameMonth(giorno, mese) || disabilitato ? "text-muted/40" : "text-ink"} ${selezionato ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}
                 >
                   <span
                     className={`nums inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs ${isSameDay(giorno, oggi()) ? "bg-accent font-semibold text-[#0b0d0e]" : ""}`}

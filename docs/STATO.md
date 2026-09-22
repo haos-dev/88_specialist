@@ -19,19 +19,19 @@ eseguito contro un database vero, perché il progetto Supabase non esiste ancora
 
 ## 1. Stack e architettura
 
-| | |
-|---|---|
-| Frontend | React 19 + Vite 7, **TypeScript** |
-| Stili | Tailwind v4, token in `src/index.css` (`@theme`) |
-| Routing | `react-router-dom` |
-| Stato server | TanStack Query |
-| Form | `react-hook-form` + `zod` |
-| Drag & drop | `@dnd-kit` (riordino anche da tastiera) |
-| Date | `date-fns`, locale `it` |
-| PWA | `vite-plugin-pwa`, manifest + service worker, **solo app shell in cache** |
-| Backend | Supabase (Postgres + Auth + Storage) — **non ancora creato** |
-| Test | Vitest, solo logica pura — **nessun test contro database** |
-| Deploy | hosting statico, `vercel.json` già scritto — **non ancora collegato** |
+|              |                                                                           |
+| ------------ | ------------------------------------------------------------------------- |
+| Frontend     | React 19 + Vite 7, **TypeScript**                                         |
+| Stili        | Tailwind v4, token in `src/index.css` (`@theme`)                          |
+| Routing      | `react-router-dom`                                                        |
+| Stato server | TanStack Query                                                            |
+| Form         | `react-hook-form` + `zod`                                                 |
+| Drag & drop  | `@dnd-kit` (riordino anche da tastiera)                                   |
+| Date         | `date-fns`, locale `it`                                                   |
+| PWA          | `vite-plugin-pwa`, manifest + service worker, **solo app shell in cache** |
+| Backend      | Supabase (Postgres + Auth + Storage) — **non ancora creato**              |
+| Test         | Vitest, solo logica pura — **nessun test contro database**                |
+| Deploy       | hosting statico, `vercel.json` già scritto — **non ancora collegato**     |
 
 Niente Electron, niente SQLite, niente sync via git, niente protocollo `media://`: tutti problemi
 della v2, non applicabili qui.
@@ -122,6 +122,7 @@ anonimi".
 Nessuna migrazione è stata ancora applicata: non esiste un database.
 
 **Due aggiunte non ancora nel database reale, solo in migrazioni scritte (0007)**:
+
 - `clients`: `height_cm`, `weight_kg`, `goal` (tutti opzionali, con check di range largo — vedi
   PRD §3.1/§7).
 - `workout_plans`: `client_id` ora nullable, nuovo campo `is_template`, con un check che impone
@@ -135,13 +136,13 @@ Nessuna migrazione è stata ancora applicata: non esiste un database.
 
 Le migrazioni contengono anche funzioni Postgres chiamate dall'app via `rpc()`:
 
-| Funzione | Perché esiste |
-|---|---|
-| `rinnova_scheda(plan_id, titolo, inizio, fine)` | Copia scheda + giorni + esercizi in **una** transazione. Dal client sarebbero 3+ round-trip: un errore a metà lascerebbe una scheda senza esercizi. |
-| `riordina_giorni(plan_id, ids[], posizioni[])` | Un solo UPDATE dopo un drag&drop, invece di N. |
-| `riordina_esercizi(day_id, ids[], posizioni[])` | Idem, e il vincolo su `day_id` rende impossibile spostare un esercizio in un altro giorno (PRD §3.3). |
-| `rigenera_token_calendario()` | Ruota `trainer_settings.calendar_feed_token` (PRD §3.7); gestisce anche il caso "la riga non esiste ancora" come A7. |
-| `applica_template(template_id, client_id, titolo, inizio, fine)` | Gemella di `rinnova_scheda`, ma verso un `client_id` di destinazione diverso dall'origine (0007, PRD §3.3bis). |
+| Funzione                                                         | Perché esiste                                                                                                                                       |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rinnova_scheda(plan_id, titolo, inizio, fine)`                  | Copia scheda + giorni + esercizi in **una** transazione. Dal client sarebbero 3+ round-trip: un errore a metà lascerebbe una scheda senza esercizi. |
+| `riordina_giorni(plan_id, ids[], posizioni[])`                   | Un solo UPDATE dopo un drag&drop, invece di N.                                                                                                      |
+| `riordina_esercizi(day_id, ids[], posizioni[])`                  | Idem, e il vincolo su `day_id` rende impossibile spostare un esercizio in un altro giorno (PRD §3.3).                                               |
+| `rigenera_token_calendario()`                                    | Ruota `trainer_settings.calendar_feed_token` (PRD §3.7); gestisce anche il caso "la riga non esiste ancora" come A7.                                |
+| `applica_template(template_id, client_id, titolo, inizio, fine)` | Gemella di `rinnova_scheda`, ma verso un `client_id` di destinazione diverso dall'origine (0007, PRD §3.3bis).                                      |
 
 Tutte `security invoker` più `revoke`/`grant` espliciti (solo `authenticated`): le policy RLS
 continuano ad applicarsi e nessuna è chiamabile da `anon`.
@@ -155,17 +156,17 @@ e rispetta gli stessi vincoli, inclusi "si elimina solo ciò che è archiviato" 
 batch. Quello che si vede in modalità fixtures è quello che si otterrà una volta collegato il
 backend.
 
-| Dominio | Operazioni | File |
-|---|---|---|
-| auth | `sessioneCorrente` `accedi` `esci` `osservaSessione` | `data/supabase/auth.ts` |
-| clienti | `elenco` `dettaglio` `crea` `aggiorna` `impostaAttivo` `elimina` | `data/supabase/clienti.ts` |
-| esercizi | `elenco`(paginato) `dettaglio` `crea` `aggiorna` `impostaArchiviato` `utilizzi` `elimina` `gruppiMuscolari` | `data/supabase/esercizi.ts` |
-| schede | `elencoPerCliente` `inScadenza` `dettaglio` `crea` `aggiorna` `impostaStato` `elimina` `rinnova` | `data/supabase/schede.ts` |
-| schede → giorni | `aggiungiGiorno` `rinominaGiorno` `eliminaGiorno` `riordinaGiorni` | idem |
-| schede → esercizi | `aggiungiEsercizio` `aggiornaEsercizio` `rimuoviEsercizio` `riordinaEsercizi` | idem |
-| schede → template | `elencoTemplate` `creaTemplate` `aggiornaTemplate` `applicaTemplate` `eliminaTemplate` | idem — stesso file, un template è una Scheda (PRD §3.3bis) |
-| impostazioni | `leggi` `salva` `rigeneraTokenCalendario` | `data/supabase/impostazioni.ts` |
-| appuntamenti | `elenco`(per mese) `crea` `elimina` | `data/supabase/appuntamenti.ts` |
+| Dominio           | Operazioni                                                                                                  | File                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| auth              | `sessioneCorrente` `accedi` `esci` `osservaSessione`                                                        | `data/supabase/auth.ts`                                    |
+| clienti           | `elenco` `dettaglio` `crea` `aggiorna` `impostaAttivo` `elimina`                                            | `data/supabase/clienti.ts`                                 |
+| esercizi          | `elenco`(paginato) `dettaglio` `crea` `aggiorna` `impostaArchiviato` `utilizzi` `elimina` `gruppiMuscolari` | `data/supabase/esercizi.ts`                                |
+| schede            | `elencoPerCliente` `inScadenza` `dettaglio` `crea` `aggiorna` `impostaStato` `elimina` `rinnova`            | `data/supabase/schede.ts`                                  |
+| schede → giorni   | `aggiungiGiorno` `rinominaGiorno` `eliminaGiorno` `riordinaGiorni`                                          | idem                                                       |
+| schede → esercizi | `aggiungiEsercizio` `aggiornaEsercizio` `rimuoviEsercizio` `riordinaEsercizi`                               | idem                                                       |
+| schede → template | `elencoTemplate` `creaTemplate` `aggiornaTemplate` `applicaTemplate` `eliminaTemplate`                      | idem — stesso file, un template è una Scheda (PRD §3.3bis) |
+| impostazioni      | `leggi` `salva` `rigeneraTokenCalendario`                                                                   | `data/supabase/impostazioni.ts`                            |
+| appuntamenti      | `elenco`(per mese) `crea` `elimina`                                                                         | `data/supabase/appuntamenti.ts`                            |
 
 Due dettagli di PostgREST che valgono la pena di ricordare, perché sono facili da sbagliare:
 
@@ -173,7 +174,7 @@ Due dettagli di PostgREST che valgono la pena di ricordare, perché sono facili 
   **senza** `!inner`: restringe le righe contate, non i clienti restituiti. Un cliente senza
   schede attive compare comunque, con conteggio 0.
 - Nelle schede in scadenza `clients!inner` è invece deliberato: lì il filtro sul cliente
-  archiviato deve *escludere* la scheda, non solo svuotare la relazione.
+  archiviato deve _escludere_ la scheda, non solo svuotare la relazione.
 
 ---
 
@@ -209,8 +210,8 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
   eliminazione diretta al loro posto.
 - **Stampa** — anteprima in una scheda nuova, immagini attese prima di stampare, nome file
   proposto `Scheda - Mario Rossi - Ipertrofia — blocco 1`.
-- **Impostazioni** — intestazione, recapiti, soglia di preavviso, anteprima del logo, **link del
-  feed calendario con copia/rigenerazione**.
+- **Impostazioni** — soglia di preavviso, **link del feed calendario con copia/rigenerazione**,
+  e logout.
 - **Feed calendario (.ics)** — `supabase/functions/calendar-feed`: dato un token valido,
   restituisce gli appuntamenti (±1 anno da oggi) in formato iCalendar, pronto per
   "iscriviti a calendario da URL" su Apple/Google/Outlook Calendar. A senso unico, non richiede
@@ -237,18 +238,18 @@ hanno un file di test dedicato; il wiring dati non lo ha mai avuto neanche per R
 
 ## 6. Roadmap
 
-- [x] Fase 1 — Scaffold webapp + schema SQL *(schema scritto, non applicato)*
-- [x] Fase 2 — Autenticazione *(codice completo; account da creare)*
+- [x] Fase 1 — Scaffold webapp + schema SQL _(schema scritto, non applicato)_
+- [x] Fase 2 — Autenticazione _(codice completo; account da creare)_
 - [x] Fase 3 — Clienti (CRUD completo)
-- [x] Fase 4 — Esercizi (CRUD completo + script di seed) *(seed scritto, non eseguito)*
+- [x] Fase 4 — Esercizi (CRUD completo + script di seed) _(seed scritto, non eseguito)_
 - [x] Fase 5 — Builder schede (drag&drop, rinnova, archivia)
 - [x] Fase 6 — Reminder scadenze
 - [x] Fase 7 — Export PDF (anteprima HTML + stampa nativa)
-- [x] Fase 8 — Impostazioni e branding
+- [x] Fase 8 — Impostazioni operative
 - [x] Fase 9 — PWA (manifest, service worker, icone)
-- [x] Fase 9bis — Calendario appuntamenti + feed iCalendar *(non pianificata in origine, vedi
-      nota §3; documentata ora, migrazione 0005+0006 non ancora applicata)*
-- [x] Fase 9ter — Campi corporei cliente + Template di allenamento *(0007, non ancora applicata)*
+- [x] Fase 9bis — Calendario appuntamenti + feed iCalendar _(non pianificata in origine, vedi
+      nota §3; documentata ora, migrazione 0005+0006 non ancora applicata)_
+- [x] Fase 9ter — Campi corporei cliente + Template di allenamento _(0007, non ancora applicata)_
 - [ ] Fase 10 — **Deploy e wiring** → §9
 
 ---
@@ -297,7 +298,7 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
   interagire". Nessuna ombra, da nessuna parte.
 - **Movimento**: solo in risposta a un'azione (trascinare, aprire un dialog). `prefers-reduced-motion`
   rispettato.
-- **Stampa**: il blocco `@media print` ridefinisce i *token*, non i singoli bordi — così la
+- **Stampa**: il blocco `@media print` ridefinisce i _token_, non i singoli bordi — così la
   gerarchia dei filetti regge anche col toner. Un giorno di allenamento non si spezza mai a metà
   pagina.
 
@@ -323,11 +324,11 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
   presenti in Dashboard, costruiti senza passare da PRD/STATO — colmato il disallineamento
   aggiornando entrambi (PRD §3.7/§4/§7, questo file §3/§5/§6).
 - **Aggiunto**: migrazione `0006_calendar_feed.sql` (colonna `trainer_settings.calendar_feed_token`
-  + funzione `rigenera_token_calendario()`, `security invoker`, `revoke`/`grant` come le altre
-  funzioni di `0004`); Edge Function `supabase/functions/calendar-feed` che genera un feed
-  `.ics` filtrato per owner tramite il token (±1 anno da oggi, RFC 5545: escaping, piegatura
-  righe, `DTSTART`/`DTEND` in `TZID=Europe/Rome`); UI in Impostazioni per generare/copiare/
-  rigenerare il link, con conferma prima di rigenerare (invalida le iscrizioni esistenti).
+  - funzione `rigenera_token_calendario()`, `security invoker`, `revoke`/`grant` come le altre
+    funzioni di `0004`); Edge Function `supabase/functions/calendar-feed` che genera un feed
+    `.ics` filtrato per owner tramite il token (±1 anno da oggi, RFC 5545: escaping, piegatura
+    righe, `DTSTART`/`DTEND` in `TZID=Europe/Rome`); UI in Impostazioni per generare/copiare/
+    rigenerare il link, con conferma prima di rigenerare (invalida le iscrizioni esistenti).
 - **File toccati**: `supabase/migrations/0006_calendar_feed.sql` (nuovo),
   `supabase/functions/calendar-feed/index.ts` (nuovo), `src/types/database.ts`
   (`calendar_feed_token`, tipo della funzione rpc), `src/data/types.ts` (`ImpostazioniApi`),
@@ -340,6 +341,14 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
   richiede un progetto Supabase reale, non ancora creato).
 - **A senso unico per scelta**: quanto inserito nell'app compare sul calendario del telefono, non
   il contrario. Un sync bidirezionale vorrebbe dire CalDAV, esplicitamente fuori scope (PRD §4).
+
+### Fase 9quater — Semplificazione impostazioni (completata)
+
+- Rimossi i campi trainer di intestazione, branding e recapiti dall'interfaccia, dal contratto
+  dati, dai fixture e dall'output stampato.
+- Aggiunta la migrazione `0008_remove_trainer_profile_settings.sql`, che conserva solo soglia
+  reminder e token del feed calendario.
+- Il feed usa il nome stabile `PT Manager`; il token e la sua rotazione restano invariati.
 
 ### Fase 9ter — Campi corporei cliente + Template di allenamento (completata)
 
@@ -357,7 +366,7 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
   `src/types/database.ts` (`ClientRow`, `WorkoutPlanRow`, RPC `applica_template`, `ConDefault`);
   `src/types/domain.ts` (`ClienteInput`, `SchedaCompleta.cliente` nullable, `TemplateSintesi`,
   `TemplateInput`); `src/data/types.ts` (`SchedeApi` + 5 metodi template); `src/data/supabase/
-  {clienti,schede}.ts`; `src/data/fixtures/{dati,index}.ts` (seed con 3 clienti con valori
+{clienti,schede}.ts`; `src/data/fixtures/{dati,index}.ts` (seed con 3 clienti con valori
   corporei d'esempio + un template "Full body — 3 giorni" con 2 giorni/6 esercizi); nuovi
   `src/features/plans/{TemplateForm,ApplyTemplateDialog}.tsx`; `src/features/plans/usePlans.ts`
   (+5 hook, + chiave query `chiavi.schede.template`); `src/features/clients/ClientForm.tsx`;
@@ -423,14 +432,14 @@ Il trigger di `0003` gli crea automaticamente la riga in `trainer_settings`.
 
 ### 9.4 Storage
 
-**Storage → New bucket**, due bucket **pubblici**:
+**Storage → New bucket**, un bucket **pubblico**:
 
-| Bucket | Contenuto |
-|---|---|
+| Bucket           | Contenuto                                                                 |
+| ---------------- | ------------------------------------------------------------------------- |
 | `exercise-media` | immagini e gif degli esercizi (lo crea anche lo script di seed, se manca) |
-| `branding` | il logo del trainer |
 
-Pubblici perché finiscono in `<img src>` sul foglio stampato, e gli URL firmati scadrebbero.
+Pubblico perché i media finiscono in `<img src>` sul foglio stampato, e gli URL firmati
+scadrebbero.
 
 ### 9.5 Seed della libreria esercizi
 

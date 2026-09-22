@@ -23,12 +23,13 @@ personal trainer, per:
 2. Costruire e organizzare una **libreria di esercizi** riutilizzabile (immagini/gif
    dimostrative), popolata da un dataset esterno open source.
 3. Creare **schede di allenamento** personalizzate per cliente.
-4. **Esportare le schede in PDF**, con branding del trainer.
+4. **Esportare le schede in PDF**, con il contenuto completo della scheda.
 5. Ricevere **reminder in-app** per le schede in scadenza.
 6. Lavorare da **qualunque dispositivo con un browser**, dati sempre allineati perché vivono in
    un unico backend condiviso — nessuna sincronizzazione da gestire.
 
 Vincoli chiave:
+
 - **Un solo trainer, un solo account**: autenticazione minima (email+password), nessun sistema
   multi-tenant nell'MVP (ma schema dati progettato in modo da non escluderlo in futuro, vedi §7).
 - **Richiede connessione internet** per leggere/scrivere dati (confermato accettabile: il
@@ -48,10 +49,11 @@ Vincoli chiave:
 
 ## 3. Funzionalità principali
 
-*(Le funzionalità di prodotto restano concettualmente quelle già definite in v2 — cambia come
-sono costruite sotto, non cosa fanno per il trainer.)*
+_(Le funzionalità di prodotto restano concettualmente quelle già definite in v2 — cambia come
+sono costruite sotto, non cosa fanno per il trainer.)_
 
 ### 3.1 Gestione Clienti
+
 - Pagina "Clienti": elenco con ricerca live, filtro attivi/archiviati.
 - Pagina dedicata per cliente: anagrafica, **altezza, peso, obiettivo** (tutti opzionali), note,
   elenco di tutti i piani di allenamento di quel cliente.
@@ -59,6 +61,7 @@ sono costruite sotto, non cosa fanno per il trainer.)*
   (solo su clienti già archiviati, con conferma).
 
 ### 3.2 Libreria Esercizi
+
 - Elenco con ricerca e filtro per gruppo muscolare; ogni esercizio ha nome, gruppo muscolare,
   descrizione, immagine/gif.
 - CRUD completo, con avviso se l'esercizio è in uso in una o più schede prima di eliminarlo.
@@ -78,6 +81,7 @@ sono costruite sotto, non cosa fanno per il trainer.)*
   dispositivo" — è semplicemente parte dello stesso database).
 
 ### 3.3 Creazione e Gestione Schede di Allenamento
+
 - Scheda collegata a un cliente: titolo, periodo di validità, note, stato (`active`/
   `archived`).
 - Giorni di allenamento riordinabili via drag&drop; esercizi riordinabili via drag&drop
@@ -90,6 +94,7 @@ sono costruite sotto, non cosa fanno per il trainer.)*
   convenzione già usata per i Clienti).
 
 ### 3.3bis Template di Allenamento
+
 - Il trainer può creare **template**: strutture di giorni/esercizi riutilizzabili, non legate a
   nessun cliente, che vive nella pagina Esercizi (concettualmente è materiale di libreria, come
   gli esercizi stessi — non appartiene a un cliente specifico più di quanto lo faccia un
@@ -108,8 +113,9 @@ sono costruite sotto, non cosa fanno per il trainer.)*
   la scheda che ne nasce.
 
 ### 3.4 Esportazione PDF
-- Genera un PDF con branding del trainer (logo, colori), stesso contenuto già definito in v2
-  (intestazione trainer+cliente, giorni con tabella esercizi, immagine dove disponibile).
+
+- Genera un PDF con il contenuto della scheda (cliente, periodo, giorni con tabella esercizi,
+  immagine dove disponibile).
 - **Meccanismo scelto**: cliccando "Esporta", si apre una nuova scheda del browser con
   un'**anteprima HTML** della scheda (lo stesso template già progettato, renderizzato come
   componente React con i dati reali). Il trainer la rivede e, se soddisfatto, la stampa/salva
@@ -124,12 +130,15 @@ sono costruite sotto, non cosa fanno per il trainer.)*
 - Gestione robusta dei casi limite: scheda senza giorni, esercizio senza media, note lunghe,
   schede con molti giorni (interruzioni di pagina corrette via CSS `@media print`).
 
-### 3.5 Impostazioni Trainer
-- Nome attività, logo, colori, contatti — usati nel PDF.
+### 3.5 Impostazioni
+
 - Soglia reminder (giorni di preavviso, default 7).
+- Link segreto rigenerabile per iscrivere un calendario esterno al feed appuntamenti.
+- Logout dell'account.
 - Nessuna configurazione di sync da gestire (non esiste più quel concetto).
 
 ### 3.6 Reminder Scadenze Schede
+
 - Badge in Sidebar + widget in Dashboard per schede in scadenza/scadute (solo schede `active`,
   esclusi i clienti archiviati).
 - `end_date < oggi` → scaduta; `oggi ≤ end_date ≤ oggi + soglia` → in scadenza. Schede senza
@@ -137,6 +146,7 @@ sono costruite sotto, non cosa fanno per il trainer.)*
 - Nessuna notifica nativa del sistema operativo — solo in-app.
 
 ### 3.7 Calendario Appuntamenti
+
 > Implementata in sviluppo senza passare da questo documento — sezione aggiunta a posteriori
 > per allinearlo al codice reale (tabella `appointments`, componente
 > `AppointmentCalendar.tsx`), non il contrario.
@@ -172,7 +182,7 @@ sono costruite sotto, non cosa fanno per il trainer.)*
 - **Richiede connessione** per leggere/scrivere dati; l'assenza di rete va comunicata in modo
   chiaro (non un errore generico), l'app non deve crashare o bloccarsi.
 - **PWA installabile**: manifest, service worker per la cache dell'app shell (l'interfaccia si
-  apre anche offline, i dati no), icone, `theme-color` coerente col branding.
+  apre anche offline, i dati no), icone, `theme-color` coerente con l'app.
 - **Backend**: Supabase (Postgres + Auth + Storage), Row Level Security attiva su tutte le
   tabelle fin dal primo giorno (anche con un solo trainer: è la pratica raccomandata da Supabase
   e previene che l'API pubblica esponga dati per un errore di configurazione).
@@ -319,8 +329,6 @@ workout_day_exercises (
 
 trainer_settings (
   owner_id uuid primary key references auth.users(id) on delete cascade default auth.uid(),
-  business_name text, logo_url text, primary_color text, secondary_color text,
-  address text, phone text, email text,
   reminder_days_before integer default 7,
   calendar_feed_token text unique default encode(gen_random_bytes(24), 'hex')  -- §3.7
 )
@@ -358,8 +366,8 @@ scadenze, `workout_days(plan_id, day_order)`, `workout_day_exercises(day_id, ord
 3. **Multi-dispositivo**: aprendo l'app da un altro computer/browser, dopo il login i dati sono
    identici, perché è lo stesso database — nessuna azione richiesta.
 4. **Scheda in scadenza**: il trainer la rinnova (duplica con nuove date) o la archivia.
-5. **Esportazione PDF**: dalla scheda, genera il PDF con branding del trainer (meccanismo
-   esatto da definire in fase di implementazione, vedi §3.4).
+5. **Esportazione PDF**: dalla scheda, genera il PDF con l'anteprima HTML e la stampa nativa
+   del browser (vedi §3.4).
 
 ---
 
@@ -371,21 +379,21 @@ restano la descrizione del prodotto; questa è il verbale di come è stata resa 
 
 ### 9.1 Difetti dello schema (`[Ax]`, corretti in §7 e nelle migrazioni)
 
-| # | Cos'era | Perché era un problema | Cosa si è fatto |
-|---|---|---|---|
-| A1 | §5 e §6.3 dicono "RLS su tutte le tabelle"; §7 dà a `exercises` nessun `owner_id`. | Contraddizione apparente fra "filtrata per utente" e "libreria condivisa". Lasciata così, `exercises` sarebbe finita senza RLS del tutto — e con la anon key nel bundle, leggibile da chiunque. | Si separa "RLS attiva" da "filtrata per proprietario": `exercises` ha RLS attiva con una policy che concede tutto agli autenticati e nulla agli anonimi. |
-| A2 | `workout_day_exercises.exercise_id` non dichiara una regola di cancellazione. | Postgres applica `NO ACTION`: la delete promessa in §3.2 ("avviso se in uso, poi elimina") sarebbe fallita con un errore di vincolo. E cancellare davvero un esercizio in uso riscriverebbe le schede passate dei clienti. | `on delete restrict` esplicito + colonna `archived` su `exercises`. La UI conta gli utilizzi, e se ce ne sono propone l'archiviazione invece dell'eliminazione. |
-| A3 | `status text not null default 'active'`, commento `-- 'active' \| 'archived'`. | Il commento non è un vincolo: qualunque stringa sarebbe entrata. | `check (status in ('active','archived'))`. |
-| A4 | `updated_at timestamptz not null default now()`. | Il default vale solo all'insert: senza trigger la colonna resta uguale a `created_at` per sempre. | Funzione `set_updated_at()` + trigger su `clients`, `exercises`, `workout_plans`. |
-| A5 | §3.2 dice che il seed deduplica per nome. | Niente lo imponeva: due esecuzioni dello script avrebbero creato il doppio delle righe. | `unique index on exercises (lower(name))`. Rende anche il seed rieseguibile. |
-| A6 | Nessun indice oltre alle chiavi primarie. | §5 chiede prestazioni "istantanee": l'elenco clienti, il calcolo scadenze e il caricamento di una scheda avrebbero fatto sequential scan. | Sette indici sui percorsi di accesso reali, incluso un indice parziale per le scadenze. |
-| A7 | `trainer_settings` è una riga per trainer, che nessuno crea. | Ogni lettura doveva gestire "la riga non c'è", e la soglia reminder sarebbe stata `undefined` al primo accesso — facendo sparire il badge scadenze. | Trigger su `auth.users`, più un fallback difensivo a 7 giorni nel codice dell'app. |
-| A8 | `exercises` ha `created_at` ma non `updated_at`. | Incoerente con tutte le altre tabelle. | Aggiunta. |
-| A9 | "Archiviato" è `clients.active boolean` ma `workout_plans.status text`. | Due modi di dire la stessa cosa. | **Non corretto**: cambiarlo dopo avrebbe rotto il PRD senza guadagno reale. Il codice lo nasconde dietro un helper per dominio. Annotato perché resti una scelta e non una svista. |
+| #   | Cos'era                                                                            | Perché era un problema                                                                                                                                                                                                     | Cosa si è fatto                                                                                                                                                                    |
+| --- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | §5 e §6.3 dicono "RLS su tutte le tabelle"; §7 dà a `exercises` nessun `owner_id`. | Contraddizione apparente fra "filtrata per utente" e "libreria condivisa". Lasciata così, `exercises` sarebbe finita senza RLS del tutto — e con la anon key nel bundle, leggibile da chiunque.                            | Si separa "RLS attiva" da "filtrata per proprietario": `exercises` ha RLS attiva con una policy che concede tutto agli autenticati e nulla agli anonimi.                           |
+| A2  | `workout_day_exercises.exercise_id` non dichiara una regola di cancellazione.      | Postgres applica `NO ACTION`: la delete promessa in §3.2 ("avviso se in uso, poi elimina") sarebbe fallita con un errore di vincolo. E cancellare davvero un esercizio in uso riscriverebbe le schede passate dei clienti. | `on delete restrict` esplicito + colonna `archived` su `exercises`. La UI conta gli utilizzi, e se ce ne sono propone l'archiviazione invece dell'eliminazione.                    |
+| A3  | `status text not null default 'active'`, commento `-- 'active' \| 'archived'`.     | Il commento non è un vincolo: qualunque stringa sarebbe entrata.                                                                                                                                                           | `check (status in ('active','archived'))`.                                                                                                                                         |
+| A4  | `updated_at timestamptz not null default now()`.                                   | Il default vale solo all'insert: senza trigger la colonna resta uguale a `created_at` per sempre.                                                                                                                          | Funzione `set_updated_at()` + trigger su `clients`, `exercises`, `workout_plans`.                                                                                                  |
+| A5  | §3.2 dice che il seed deduplica per nome.                                          | Niente lo imponeva: due esecuzioni dello script avrebbero creato il doppio delle righe.                                                                                                                                    | `unique index on exercises (lower(name))`. Rende anche il seed rieseguibile.                                                                                                       |
+| A6  | Nessun indice oltre alle chiavi primarie.                                          | §5 chiede prestazioni "istantanee": l'elenco clienti, il calcolo scadenze e il caricamento di una scheda avrebbero fatto sequential scan.                                                                                  | Sette indici sui percorsi di accesso reali, incluso un indice parziale per le scadenze.                                                                                            |
+| A7  | `trainer_settings` è una riga per trainer, che nessuno crea.                       | Ogni lettura doveva gestire "la riga non c'è", e la soglia reminder sarebbe stata `undefined` al primo accesso — facendo sparire il badge scadenze.                                                                        | Trigger su `auth.users`, più un fallback difensivo a 7 giorni nel codice dell'app.                                                                                                 |
+| A8  | `exercises` ha `created_at` ma non `updated_at`.                                   | Incoerente con tutte le altre tabelle.                                                                                                                                                                                     | Aggiunta.                                                                                                                                                                          |
+| A9  | "Archiviato" è `clients.active boolean` ma `workout_plans.status text`.            | Due modi di dire la stessa cosa.                                                                                                                                                                                           | **Non corretto**: cambiarlo dopo avrebbe rotto il PRD senza guadagno reale. Il codice lo nasconde dietro un helper per dominio. Annotato perché resti una scelta e non una svista. |
 
 ### 9.2 Comportamenti che il PRD dava per scontati (`[Bx]`)
 
-- **B1 — Rinnova.** §3.3 dice "duplica con nuove date" senza dire *quali* date né *cosa* si
+- **B1 — Rinnova.** §3.3 dice "duplica con nuove date" senza dire _quali_ date né _cosa_ si
   duplica. Deciso: copia profonda (giorni **e** esercizi dentro ai giorni, ordine conservato);
   date proposte in un dialog — si riparte dal giorno dopo la fine precedente conservando la
   durata, o da oggi se quella scheda è già scaduta; nessun suffisso automatico al titolo.
@@ -426,15 +434,15 @@ restano la descrizione del prodotto; questa è il verbale di come è stata resa 
 
 ### 9.3 Scelte tecniche lasciate aperte dal PRD
 
-| Ambito | Scelta | Perché |
-|---|---|---|
-| Linguaggio | **TypeScript** (§6.2 diceva `.jsx`) | Con un'app che parla direttamente a PostgREST, un nome di colonna sbagliato è invisibile fino al runtime. I tipi dello schema lo trasformano in un errore di compilazione. |
-| Routing | `react-router-dom` | — |
-| Stato server | **TanStack Query** | "Istantaneo" (§5) più la freschezza fra pagine (modifichi un cliente, l'intestazione della scheda si aggiorna) è invalidazione di cache. Con `useEffect` a mano non viene. |
-| Drag & drop | **`@dnd-kit`** | `react-beautiful-dnd` non è più mantenuto; dnd-kit dà il riordino da tastiera senza scrivere altro codice. |
-| Form | `react-hook-form` + `zod` | Uno schema solo fa validazione, messaggi in italiano e normalizzazione stringa-vuota → `NULL`. |
-| Date | `date-fns` + locale `it` | — |
-| Stili | Tailwind v4, token in `@theme` | I token `ink/paper/surface/muted/line/accent/teal` di §6.3 erano dichiarati "già definiti" ma non esistevano da nessuna parte: sono stati definiti ora. |
+| Ambito       | Scelta                              | Perché                                                                                                                                                                     |
+| ------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linguaggio   | **TypeScript** (§6.2 diceva `.jsx`) | Con un'app che parla direttamente a PostgREST, un nome di colonna sbagliato è invisibile fino al runtime. I tipi dello schema lo trasformano in un errore di compilazione. |
+| Routing      | `react-router-dom`                  | —                                                                                                                                                                          |
+| Stato server | **TanStack Query**                  | "Istantaneo" (§5) più la freschezza fra pagine (modifichi un cliente, l'intestazione della scheda si aggiorna) è invalidazione di cache. Con `useEffect` a mano non viene. |
+| Drag & drop  | **`@dnd-kit`**                      | `react-beautiful-dnd` non è più mantenuto; dnd-kit dà il riordino da tastiera senza scrivere altro codice.                                                                 |
+| Form         | `react-hook-form` + `zod`           | Uno schema solo fa validazione, messaggi in italiano e normalizzazione stringa-vuota → `NULL`.                                                                             |
+| Date         | `date-fns` + locale `it`            | —                                                                                                                                                                          |
+| Stili        | Tailwind v4, token in `@theme`      | I token `ink/paper/surface/muted/line/accent/teal` di §6.3 erano dichiarati "già definiti" ma non esistevano da nessuna parte: sono stati definiti ora.                    |
 
 ### 9.4 Nota sulla continuità con la v2
 
