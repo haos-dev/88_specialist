@@ -1,9 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PT Manager">
-  <rect width="64" height="64" fill="#0E5C52"/>
-  <!-- Un bilanciere ridotto all'osso: due dischi e la barra. -->
-  <rect x="8"  y="24" width="7"  height="16" rx="1.5" fill="#F6F7F5"/>
-  <rect x="49" y="24" width="7"  height="16" rx="1.5" fill="#F6F7F5"/>
-  <rect x="17" y="27" width="5"  height="10" rx="1.2" fill="#2E9C8A"/>
-  <rect x="42" y="27" width="5"  height="10" rx="1.2" fill="#2E9C8A"/>
-  <rect x="22" y="30" width="20" height="4"  fill="#F6F7F5"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="88Specialist"><rect width="64" height="64" rx="12" fill="#0b0d0e"/><g transform="translate(4.00 12.18) scale(0.2478)"><g transform="translate(0 0)"><path d="M18 0H82L100 18V64L88 80L100 96V142L82 160H18L0 142V96L12 80L0 64V18Z" fill="#f5f1eb"/><rect x="35" y="28" width="30" height="28" fill="#0b0d0e"/><rect x="35" y="104" width="30" height="28" fill="#0b0d0e"/></g><g transform="translate(126 0)"><path d="M18 0H82L100 18V64L88 80L100 96V142L82 160H18L0 142V96L12 80L0 64V18Z" fill="#f5f1eb"/><rect x="35" y="28" width="30" height="28" fill="#0b0d0e"/><rect x="35" y="104" width="30" height="28" fill="#0b0d0e"/></g></g></svg>
