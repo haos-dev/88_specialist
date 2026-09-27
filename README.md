@@ -29,7 +29,7 @@ caratteri.
 ## Collegare Supabase
 
 L'app è scritta per Supabase ma non è ancora collegata a un progetto. La procedura completa —
-progetto, chiavi, migrazioni, account, Storage, seed, deploy — sta in **[STATO.md §9](STATO.md)**.
+progetto, chiavi, migrazioni, account, Storage, seed, deploy — sta in **[STATO.md §9](docs/STATO.md)**.
 
 In breve: `cp .env.example .env`, compila URL e anon key, metti `VITE_USE_FIXTURES=false`,
 applica in ordine le migrazioni in `supabase/migrations/` (elenco in STATO.md §9.2).

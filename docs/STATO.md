@@ -109,9 +109,11 @@ src/
 supabase/
   migrations/               0001_schema … 0010_grants_and_supabase_fixes (elenco completo in §9.2)
   functions/calendar-feed/  Edge Function, feed .ics (§3.7)
-  seed/seed-exercises.mjs   script locale, service_role key
+  seed/seed-exercises.mjs   script locale, service_role key (§9.5)
+  seed/exerciseDataset.mjs  dataset → righe di `exercises`   ← logica pura, testata
 
 tests/                      planExpiry  renewPlan  reorder  dates  filename  trainingSchedule
+                            seedExercises
 ```
 
 **La regola che tiene su tutto**: nessuna pagina e nessun hook importa da `data/supabase/` o da
@@ -238,7 +240,7 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
 - **Offline** — avviso persistente, e messaggi che dicono cosa non è stato salvato.
 
 Qualità: `npx tsc -b` pulito · `npx eslint .` 0 errori (2 warning `react-refresh`, innocui:
-`AuthProvider` e `Toast` esportano un hook accanto al componente) · `npx vitest run` **77 test
+`AuthProvider` e `Toast` esportano un hook accanto al componente) · `npx vitest run` **88 test
 verdi** · `npm run build` produce `dist/` con manifest e service worker.
 
 ⚠️ Nessun test automatico copre ancora la logica del feed calendario (escaping ICS, calcolo
@@ -272,6 +274,7 @@ hanno un file di test dedicato; il wiring dati non lo ha mai avuto neanche per R
 - [x] Fase 9quinquies — Giorni di allenamento → lezioni in calendario + correzioni audit
       _(0009, non ancora applicata)_
 - [x] Fase 9sexies — Migrazioni pronte per un progetto Supabase nuovo (0010) + pulizia
+- [x] Fase 9septies — Seed della libreria dal dataset `exercises-dataset` (§9.5)
 - [ ] Fase 10 — **Deploy e wiring** → §9
 
 ---
@@ -476,6 +479,30 @@ leggibile a un metro di distanza in palestra, e condivide con lo schermo il sist
   pagina Templates al posto della pagina Esercizi (la libreria è un dialog), nessuna
   archiviazione degli esercizi, mappa dei file, Vercel già collegato, PRD §3.3bis e §6.2.
 
+### Fase 9septies — Seed della libreria esercizi (completata)
+
+- **Trovato**: `seed-exercises.mjs` era scritto per un dataset generico e su `exercises-dataset`
+  avrebbe prodotto dati sbagliati: descrizione `"[object Object]"` (le istruzioni sono un oggetto
+  per lingua), gruppo muscolare preso da `muscle_group` (un muscolo sinergico, in inglese) invece
+  di `target`, miniatura JPG statica al posto della GIF. In più l'upsert su `name` non poteva
+  usare l'indice su `lower(name)`: ricadeva sempre sugli insert uno per uno, e non aggiornava mai.
+  Chiedeva anche di copiare il dataset nel progetto e usava sintassi bash, inutile su Windows.
+- **Riscritto**: logica pura in `supabase/seed/exerciseDataset.mjs` (tipi in `.d.mts`, 11 test in
+  `tests/seedExercises.test.ts`, fra cui "ogni target del dataset ha un gruppo" e "solo gruppi
+  che l'app conosce"); lo script legge il dataset da `--cartella`, la prova a vuoto non chiede
+  chiavi, carica 6 GIF alla volta con un nuovo tentativo, legge gli esercizi esistenti a pagine
+  da 1000 (limite di PostgREST), salta quelli già presenti o li aggiorna con `--aggiorna`.
+- **Verificato** con il dataset vero (`exercises.json` completo e 25 GIF reali) contro un finto
+  Supabase locale (REST + Storage, vincolo su `lower(name)`, pagine da 1000): prima esecuzione,
+  rilancio senza doppioni, `--aggiorna`, esecuzione completa da 1318 esercizi, un conflitto a metà
+  lotto (ripiega riga per riga). **Non** provato contro un progetto Supabase vero.
+- **Chiavi nuove di Supabase**: i progetti creati da fine 2025 hanno `sb_publishable_…` e
+  `sb_secret_…` al posto di anon e service_role. Lo script accetta la secret key
+  (`SUPABASE_SECRET_KEY`) o la service_role, e rifiuta publishable e anon spiegando quale serve.
+  §9.1, §9.5 e §9.8 dicono ora quale chiave va dove.
+- **Feed calendario**: il comando di deploy in §9.6bis non aveva `--no-verify-jwt`, quindi la
+  funzione avrebbe risposto 401 alle app di calendario, che non mandano un JWT. Aggiunto.
+
 ---
 
 ## 9. Da fare da te (wiring)
@@ -486,14 +513,20 @@ Tutto ciò che richiede di creare o configurare qualcosa fuori dal codice. In or
 
 1. Crea un progetto su [supabase.com](https://supabase.com). Scegli la regione più vicina
    (Frankfurt, per l'Italia).
-2. **Project Settings → API**: copia `Project URL` e `anon public`.
+2. **Project Settings → API Keys**: copia la **publishable key** (`sb_publishable_…`), più il
+   Project URL (`https://<ref>.supabase.co`, dove `<ref>` è l'ID del progetto). I progetti creati da fine 2025 non hanno più
+   le vecchie chiavi `anon` e `service_role` ma queste nuove, che le sostituiscono una per una:
+   publishable al posto di anon (pubblica, va nel browser), secret (`sb_secret_…`) al posto di
+   service_role (segreta: solo seed ed Edge Function). Il codice non cambia: la variabile si
+   chiama ancora `VITE_SUPABASE_ANON_KEY`, ma ci va la publishable.
 3. `cp .env.example .env` e compila:
    ```
    VITE_USE_FIXTURES=false
    VITE_SUPABASE_URL=https://xxxxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJ...
+   VITE_SUPABASE_ANON_KEY=sb_publishable_...
    ```
-   `.env` è in `.gitignore`. **Non toccare** `.env.example`.
+   `.env` è in `.gitignore`. **Non toccare** `.env.example`. **Mai** la secret key qui: tutto
+   ciò che inizia per `VITE_` finisce nel bundle pubblico.
 
 > Finché `VITE_USE_FIXTURES` è `true`, o finché le due variabili sono vuote, l'app resta sui dati
 > di esempio. Non si rompe: si limita a non parlare con nessuno.
@@ -556,18 +589,53 @@ scadrebbero.
 
 ### 9.5 Seed della libreria esercizi
 
-1. Scarica un dataset open source (es. `yuhonas/free-exercise-db`) e mettine il contenuto in
-   `supabase/seed/data/` — la cartella è già in `.gitignore`. Deve esserci `exercises.json`.
-2. Prova a vuoto, che non scrive niente:
-   ```bash
-   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node supabase/seed/seed-exercises.mjs --dry-run
-   ```
-3. Poi sul serio (`--limit 50` per provare su poche righe prima).
+Dataset: [`exercises-dataset`](https://github.com/hasaneyldrm/exercises-dataset), scaricato da
+GitHub ("Code → Download ZIP") ed estratto in una cartella qualsiasi, per esempio
+`C:\Users\<utente>\Documents\exercises-dataset-main`. Serve com'è: `data/exercises.json`,
+`videos/` (le GIF) e `images/`. Non va copiato nel progetto.
 
-La `service_role key` bypassa completamente la RLS: passala sulla riga di comando, non scriverla
-in un file, e non metterla **mai** in una variabile `VITE_*`.
+Cosa diventa ogni esercizio (logica in `supabase/seed/exerciseDataset.mjs`, testata):
 
-Lo script è rieseguibile: l'indice unico su `lower(name)` impedisce i doppioni.
+- **nome**: quello del dataset, in inglese (il dataset non ha nomi italiani);
+- **gruppo muscolare**: dal campo `target`, tradotto nei gruppi dell'app (Petto, Dorso, Addome…).
+  Tabella in `GRUPPO_DA_TARGET`: le poche scelte non ovvie (adduttori → Quadricipiti, trapezi →
+  Spalle) sono commentate lì;
+- **descrizione**: le istruzioni in italiano, un passo numerato per riga;
+- **media**: la GIF animata (≈100 KB l'una, ≈130 MB in tutto), caricata nel bucket
+  `exercise-media`, con l'attribuzione `© Gym visual` richiesta dalla licenza del dataset.
+
+I 6 nomi ripetuti nel dataset (varianti con un'altra animazione) entrano una volta sola:
+1318 esercizi su 1324 record.
+
+Da **PowerShell**, nella cartella del progetto (`npm install` già fatto, Node 20 o più recente):
+
+```powershell
+# 1. Prova a vuoto: controlla dataset e file, non scrive niente e non chiede chiavi
+npm run seed:exercises -- --cartella "C:\Users\<utente>\Documents\exercises-dataset-main" --dry-run
+
+# 2. Chiavi: Supabase → Project Settings → API Keys, la secret key. Valgono solo per questa finestra.
+$env:SUPABASE_URL = "https://xxxx.supabase.co"
+$env:SUPABASE_SECRET_KEY = "sb_secret_..."
+
+# 3. Prova su 20 esercizi, controlla nell'app che GIF e testi siano giusti
+npm run seed:exercises -- --cartella "C:\Users\<utente>\Documents\exercises-dataset-main" --limit 20
+
+# 4. Tutto il resto (qualche minuto: carica 6 GIF alla volta)
+npm run seed:exercises -- --cartella "C:\Users\<utente>\Documents\exercises-dataset-main"
+```
+
+Il passo 4 dopo il 3 non crea doppioni: **un esercizio che esiste già (stesso nome) viene
+saltato**, quindi si può rilanciare dopo un'interruzione o un errore di rete. Con `--aggiorna`
+invece viene riscritto con i dati del dataset: serve se cambi la tabella dei gruppi, ma
+sovrascrive anche le modifiche fatte a mano nell'app a quegli esercizi.
+
+Il bucket `exercise-media` lo crea lo script se manca (pubblico). Se esiste già ma è privato lo
+script si ferma: le GIF non si vedrebbero.
+
+La secret key bypassa completamente la RLS: impostala solo nella finestra del terminale come
+sopra, non scriverla in un file del progetto e non metterla **mai** in una variabile `VITE_*`.
+Lo script rifiuta la publishable (o la vecchia anon) con un messaggio chiaro; su un progetto con
+le chiavi vecchie accetta la service_role in `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### 9.6 Rigenera i tipi
 
@@ -586,11 +654,17 @@ Se non compila, TypeScript ti sta indicando esattamente dove il codice e il data
 `supabase/functions/calendar-feed` non fa parte del build della webapp: va deployata a parte.
 
 ```bash
-npx supabase functions deploy calendar-feed --project-ref <ref>
+npx supabase functions deploy calendar-feed --project-ref <ref> --no-verify-jwt
 ```
 
+**`--no-verify-jwt` è indispensabile.** Di default una Edge Function risponde 401 a chi non manda
+un JWT Supabase nell'header `Authorization`, e Apple/Google/Outlook Calendar non lo mandano:
+senza il flag ogni iscrizione al feed fallirebbe. L'autenticazione del feed è il token nell'URL,
+verificato dalla funzione stessa.
+
 Non servono secret aggiuntivi: `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` sono già disponibili
-di default in ogni Edge Function. Dopo il deploy, in **Impostazioni** dell'app compare il
+di default in ogni Edge Function (sui progetti con le chiavi nuove la seconda contiene la secret
+key: il nome della variabile resta quello). Dopo il deploy, in **Impostazioni** dell'app compare il
 pulsante per generare/copiare l'URL del feed (richiede `VITE_SUPABASE_URL` già impostata al
 punto 9.1).
 
@@ -600,7 +674,7 @@ Verifica rapida: apri l'URL copiato in un browser, deve scaricare/mostrare un fi
 
 ### 9.7 Test contro un database vero (opzionale)
 
-I 77 test attuali sono di sola logica e girano ovunque. Per testare le query servono Docker
+Gli 88 test attuali sono di sola logica e girano ovunque. Per testare le query servono Docker
 Desktop e `npx supabase start` (istanza locale), **mai** il progetto di produzione.
 
 ### 9.8 Deploy
@@ -608,8 +682,9 @@ Desktop e `npx supabase start` (istanza locale), **mai** il progetto di produzio
 1. ~~Collega il repository a Vercel~~ — fatto: Vercel pubblica già un'anteprima per ogni pull
    request. `vercel.json` contiene comando di build, cartella di output e il rewrite SPA senza
    cui `/schede/<id>/stampa` darebbe 404 se aperta direttamente.
-2. **Environment Variables** su Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
-   `VITE_USE_FIXTURES=false`.
+2. **Environment Variables** su Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (la
+   publishable key, vedi 9.1), `VITE_USE_FIXTURES=false`. Vite le legge al build: dopo averle
+   impostate serve un nuovo deploy.
 3. **Authentication → URL Configuration** su Supabase: aggiungi il dominio Vercel a Site URL e
    Redirect URLs.
 
