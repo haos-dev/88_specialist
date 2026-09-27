@@ -205,6 +205,15 @@ export type Database = {
         };
         Returns: WorkoutPlanRow;
       };
+      /**
+       * Crea un cliente e le sue lezioni in calendario in una sola
+       * transazione (0009). `p_lezioni` è un array di appuntamenti senza
+       * `client_id`: lo assegna la funzione.
+       */
+      crea_cliente_con_lezioni: {
+        Args: { p_cliente: Json; p_lezioni: Json };
+        Returns: ClientRow;
+      };
       /** Riscrive in un colpo solo le posizioni cambiate da un drag&drop (audit B2). */
       riordina_giorni: {
         Args: { p_plan_id: string; p_ids: string[]; p_posizioni: number[] };

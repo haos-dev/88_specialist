@@ -32,7 +32,7 @@ L'app è scritta per Supabase ma non è ancora collegata a un progetto. La proce
 progetto, chiavi, migrazioni, account, Storage, seed, deploy — sta in **[STATO.md §9](STATO.md)**.
 
 In breve: `cp .env.example .env`, compila URL e anon key, metti `VITE_USE_FIXTURES=false`,
-applica le quattro migrazioni in `supabase/migrations/`.
+applica in ordine le migrazioni in `supabase/migrations/` (elenco in STATO.md §9.2).
 
 ## Come è fatto
 

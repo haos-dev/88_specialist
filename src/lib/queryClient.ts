@@ -36,6 +36,7 @@ export const chiavi = {
     sommario: (soglia: number) => ["dashboard", "sommario", soglia] as const,
   },
   appuntamenti: {
+    tutti: ["appuntamenti"] as const,
     elenco: (mese: string) => ["appuntamenti", mese] as const,
   },
   clienti: {

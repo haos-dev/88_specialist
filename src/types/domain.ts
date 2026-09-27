@@ -52,6 +52,12 @@ export interface AppuntamentoInput {
   notes: string | null;
 }
 
+/**
+ * Lezione generata alla creazione di un cliente: un appuntamento il cui
+ * `client_id` è quello del cliente appena creato, e quindi non esiste ancora.
+ */
+export type LezioneInput = Omit<AppuntamentoInput, "client_id">;
+
 /** Scheda nell'elenco di un cliente / nel widget scadenze. */
 export interface SchedaSintesi extends Scheda {
   cliente_nome: string;

@@ -59,6 +59,12 @@ sono costruite sotto, non cosa fanno per il trainer.)_
   elenco di tutti i piani di allenamento di quel cliente.
 - CRUD completo: creazione, modifica, archiviazione/riattivazione, eliminazione definitiva
   (solo su clienti già archiviati, con conferma).
+- **Giorni di allenamento alla creazione** (facoltativi): per ogni giorno della settimana un
+  orario, più una data di fine (massimo dodici mesi). Ogni giorno scelto diventa una lezione di
+  un'ora in calendario (§3.7), `Lezione Nome Cognome`, da oggi alla data di fine inclusa. Cliente
+  e lezioni si salvano in una transazione sola (0009).
+- Archiviare un cliente toglie dal calendario i suoi appuntamenti futuri (con conferma: non
+  tornano riattivandolo); eliminarlo elimina anche tutti i suoi appuntamenti.
 
 ### 3.2 Libreria Esercizi
 
@@ -152,7 +158,10 @@ sono costruite sotto, non cosa fanno per il trainer.)_
 > `AppointmentCalendar.tsx`), non il contrario.
 
 - Widget calendario mensile in Dashboard: crea/elimina appuntamenti (titolo, data, orario,
-  durata, cliente opzionale, note), navigazione tra i mesi.
+  durata, cliente opzionale, note), navigazione tra i mesi. I giorni passati si consultano ma
+  non vi si crea nulla; l'eliminazione chiede conferma.
+- Le lezioni ricorrenti di un cliente nascono dal form di creazione cliente (§3.1): sono
+  appuntamenti come gli altri, uno per data.
 - Indipendente dalle Schede di allenamento: un appuntamento è un impegno puntuale (data+ora),
   non ha una `status` né entra nel reminder di scadenza.
 - **Feed iCalendar (.ics) per iscrizione da Apple/Google/Outlook Calendar** ("aggiungi
@@ -335,10 +344,10 @@ trainer_settings (
 -- [A7] la riga viene creata da un trigger su auth.users: senza, ogni lettura
 -- delle impostazioni doveva gestire "non esiste ancora".
 
-appointments (                       -- §3.7, aggiunta a posteriori (0005/0006)
+appointments (                       -- §3.7, aggiunta a posteriori (0005/0006, 0009)
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
-  client_id uuid references clients(id) on delete set null,
+  client_id uuid references clients(id) on delete cascade,  -- 0009, prima `set null`
   title text not null,
   appointment_date date not null, start_time time not null,
   duration_minutes integer not null default 60,

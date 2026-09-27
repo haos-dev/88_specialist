@@ -79,6 +79,8 @@ src/
 
   features/
     clients/                useClients.ts  ClientForm.tsx
+                            trainingSchedule.ts          ← logica pura, testata
+    appointments/           useAppointments.ts
     exercises/              useExercises.ts  ExerciseForm.tsx  ExercisePicker.tsx
     plans/                  usePlans.ts  PlanForm.tsx  TemplateForm.tsx  RenewDialog.tsx
                             ApplyTemplateDialog.tsx  PlanHeading.tsx
@@ -99,11 +101,11 @@ src/
     WorkoutBuilder  PrintPlan  Settings  NotFound
 
 supabase/
-  migrations/               0001_schema … 0007_client_metrics_and_templates (vedi §9.2 per l'elenco completo)
+  migrations/               0001_schema … 0009_client_lessons (vedi §9.2 per l'elenco completo)
   functions/calendar-feed/  Edge Function, feed .ics (§3.7)
   seed/seed-exercises.mjs   script locale, service_role key
 
-tests/                      planExpiry  renewPlan  reorder  dates  filename
+tests/                      planExpiry  renewPlan  reorder  dates  filename  trainingSchedule
 ```
 
 **La regola che tiene su tutto**: nessuna pagina e nessun hook importa da `data/supabase/` o da
@@ -113,7 +115,7 @@ tests/                      planExpiry  renewPlan  reorder  dates  filename
 
 ## 3. Schema database
 
-Otto tabelle: `clients`, `exercises`, `workout_plans`, `workout_days`, `workout_day_exercises`,
+Sette tabelle: `clients`, `exercises`, `workout_plans`, `workout_days`, `workout_day_exercises`,
 `trainer_settings`, `appointments`. Tutte con RLS attiva; tutte filtrate per `owner_id` tranne
 `exercises`, che è la libreria condivisa e ha una policy "tutto agli autenticati, niente agli
 anonimi".
@@ -167,6 +169,7 @@ backend.
 | schede → template | `elencoTemplate` `creaTemplate` `aggiornaTemplate` `applicaTemplate` `eliminaTemplate`                      | idem — stesso file, un template è una Scheda (PRD §3.3bis) |
 | impostazioni      | `leggi` `salva` `rigeneraTokenCalendario`                                                                   | `data/supabase/impostazioni.ts`                            |
 | appuntamenti      | `elenco`(per mese) `crea` `elimina`                                                                         | `data/supabase/appuntamenti.ts`                            |
+| clienti → lezioni | `crea(input, lezioni)`: cliente + lezioni in una transazione (`crea_cliente_con_lezioni`, 0009)            | `data/supabase/clienti.ts`                                 |
 
 Due dettagli di PostgREST che valgono la pena di ricordare, perché sono facili da sbagliare:
 
@@ -191,7 +194,8 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
   tempo, colmato qui), ricerca attivabile con un toggle, filtro attivi/archiviati/tutti,
   creazione, modifica, archiviazione, riattivazione, eliminazione definitiva (solo se
   archiviato, con conferma). Anagrafica ora include **altezza, peso, obiettivo** (0007, tutti
-  opzionali).
+  opzionali). Alla creazione, **giorni e orari di allenamento con data di fine**: diventano
+  lezioni da un'ora in calendario (0009).
 - **Dettaglio cliente** — layout a griglia responsive, azioni (modifica/archivia/elimina) con
   icone, anagrafica e note in evidenza (altezza/peso/obiettivo mostrati solo se compilati),
   elenco delle sue schede con stato e scadenza.
@@ -219,7 +223,7 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
 - **Offline** — avviso persistente, e messaggi che dicono cosa non è stato salvato.
 
 Qualità: `npx tsc -b` pulito · `npx eslint .` 0 errori (2 warning `react-refresh`, innocui:
-`AuthProvider` e `Toast` esportano un hook accanto al componente) · `npx vitest run` **67 test
+`AuthProvider` e `Toast` esportano un hook accanto al componente) · `npx vitest run` **77 test
 verdi** · `npm run build` produce `dist/` con manifest e service worker.
 
 ⚠️ Nessun test automatico copre ancora la logica del feed calendario (escaping ICS, calcolo
@@ -250,6 +254,8 @@ hanno un file di test dedicato; il wiring dati non lo ha mai avuto neanche per R
 - [x] Fase 9bis — Calendario appuntamenti + feed iCalendar _(non pianificata in origine, vedi
       nota §3; documentata ora, migrazione 0005+0006 non ancora applicata)_
 - [x] Fase 9ter — Campi corporei cliente + Template di allenamento _(0007, non ancora applicata)_
+- [x] Fase 9quinquies — Giorni di allenamento → lezioni in calendario + correzioni audit
+      _(0009, non ancora applicata)_
 - [ ] Fase 10 — **Deploy e wiring** → §9
 
 ---
@@ -381,6 +387,49 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
   vincolo "solo se già archiviato" — non ha schede dipendenti da proteggere (le copie create con
   "Applica a un cliente" non referenziano più il template una volta create).
 
+### Fase 9quinquies — Giorni di allenamento e lezioni in calendario (completata)
+
+- **Funzione**: il form "Nuovo cliente" ha una sezione facoltativa _Giorni di allenamento_: per
+  ogni giorno della settimana una spunta e un orario, più una data di fine libera (proposta: un
+  mese da oggi, massimo dodici). Ogni giorno scelto diventa una lezione di 60 minuti intitolata
+  `Lezione Nome Cognome`, collegata al cliente, da oggi alla data di fine inclusa; una lezione di
+  oggi con l'orario già passato non viene creata. Anteprima dal vivo ("9 lezioni, dal … al …").
+  Solo in creazione: in modifica la sezione non compare, e il programma settimanale non viene
+  salvato sul cliente (esistono solo le lezioni generate).
+- **Atomicità**: cliente e lezioni si salvano con `crea_cliente_con_lezioni` (0009), una sola
+  transazione come `rinnova_scheda`: o tutto o niente. Senza lezioni resta la insert semplice.
+- **Correzioni dall'audit**:
+  - Cache: creare/eliminare un appuntamento, o creare un cliente con lezioni, invalida tutti i
+    mesi del calendario, non solo quello a schermo. Hook degli appuntamenti spostati da
+    `features/plans/usePlans.ts` a `features/appointments/useAppointments.ts`.
+  - `appointments` ha ora il trigger `updated_at` che 0005 non aveva agganciato.
+  - Eliminare un cliente elimina i suoi appuntamenti (FK `on delete cascade`, prima `set null`:
+    restavano lezioni orfane). Archiviarlo toglie dal calendario i suoi appuntamenti **futuri**
+    (trigger, nel fuso Europe/Rome come il feed); i passati restano. L'archiviazione ora chiede
+    conferma e lo spiega, perché riattivando non tornano.
+  - Calendario: i giorni passati si possono aprire (prima erano disabilitati e i loro
+    appuntamenti non si potevano consultare né eliminare), ma non vi si crea nulla; date lette
+    senza `new Date(iso)`; nome del cliente anche se archiviato; il dialog riparte vuoto a ogni
+    apertura; eliminazione con conferma; toast di conferma/errore su crea ed elimina.
+  - Feed .ics: `piegaRiga` taglia a 75 **ottetti** senza spezzare i caratteri multi-byte (prima
+    contava caratteri, e con le lettere accentate superava il limite di RFC 5545).
+  - Documenti: elenco migrazioni in §9.2 (mancava 0008), numero tabelle, README.
+- **File toccati/creati**: `supabase/migrations/0009_client_lessons.sql` (nuovo);
+  `src/features/clients/trainingSchedule.ts` e `tests/trainingSchedule.test.ts` (nuovi);
+  `src/features/appointments/useAppointments.ts` (nuovo); `src/features/clients/{ClientForm,useClients}.ts(x)`;
+  `src/features/plans/usePlans.ts`; `src/components/dashboard/AppointmentCalendar.tsx`;
+  `src/data/{types.ts,supabase/clienti.ts,fixtures/index.ts}`; `src/types/{domain,database}.ts`;
+  `src/lib/queryClient.ts`; `src/pages/{Clients,ClientDetail}.tsx`;
+  `supabase/functions/calendar-feed/index.ts`; PRD §3.1/§3.7/§7, README, questo file.
+- **Verificato**: `npx tsc -b`, `npx eslint .` (0 errori, i soliti 2 warning), `npx vitest run`
+  (77 test, 10 nuovi) e `npm run build` puliti. Le migrazioni 0001–0009 sono state applicate a
+  un Postgres embedded (PGlite, con `auth.users`/`auth.uid()` simulati) per provare la
+  funzione: transazione annullata se una lezione viola un vincolo, RLS rispettata, `anon`
+  respinto, archiviazione che toglie solo i futuri, cascade all'eliminazione. Flusso completo
+  provato nel browser sui fixtures.
+- **Non fatto**: modificare o rigenerare in seguito il programma di un cliente; nessuna prova
+  contro un progetto Supabase vero (non esiste ancora).
+
 ---
 
 ## 9. Da fare da te (wiring)
@@ -415,6 +464,8 @@ supabase/migrations/0004_functions.sql
 supabase/migrations/0005_appointments.sql
 supabase/migrations/0006_calendar_feed.sql
 supabase/migrations/0007_client_metrics_and_templates.sql
+supabase/migrations/0008_remove_trainer_profile_settings.sql
+supabase/migrations/0009_client_lessons.sql
 ```
 
 Con la CLI: `npx supabase link --project-ref <ref>` e poi `npx supabase db push`.
@@ -487,7 +538,7 @@ Verifica rapida: apri l'URL copiato in un browser, deve scaricare/mostrare un fi
 
 ### 9.7 Test contro un database vero (opzionale)
 
-I 67 test attuali sono di sola logica e girano ovunque. Per testare le query servono Docker
+I 77 test attuali sono di sola logica e girano ovunque. Per testare le query servono Docker
 Desktop e `npx supabase start` (istanza locale), **mai** il progetto di produzione.
 
 ### 9.8 Deploy

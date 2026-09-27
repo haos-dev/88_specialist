@@ -160,6 +160,18 @@ const appuntamentiFixtures: AppuntamentiApi = {
   },
 };
 
+function rimuoviAppuntamenti(condizione: (a: Appuntamento) => boolean) {
+  const restano = appuntamenti.filter((a) => !condizione(a));
+  appuntamenti.splice(0, appuntamenti.length, ...restano);
+}
+
+/** Data e ora sono locali, come in Postgres: il confronto fra stringhe basta. */
+function appuntamentoFuturo(a: Appuntamento): boolean {
+  const adesso = new Date();
+  const orario = `${toDataISO(adesso)} ${String(adesso.getHours()).padStart(2, "0")}:${String(adesso.getMinutes()).padStart(2, "0")}:${String(adesso.getSeconds()).padStart(2, "0")}`;
+  return `${a.appointment_date} ${a.start_time}` > orario;
+}
+
 /** Piccola latenza artificiale: gli stati di caricamento vanno visti almeno una volta. */
 function attesa<T>(valore: T, ms = 120): Promise<T> {
   salvaStato();
@@ -253,7 +265,7 @@ const clientiFixtures: ClientiApi = {
     return attesa(clienti.find((c) => c.id === id) ?? null);
   },
 
-  async crea(input) {
+  async crea(input, lezioni = []) {
     const nuovo: Cliente = {
       id: uid("cl"),
       owner_id: SESSIONE_SEED.userId,
@@ -263,6 +275,17 @@ const clientiFixtures: ClientiApi = {
       updated_at: ora(),
     };
     clienti.push(nuovo);
+    // Come `crea_cliente_con_lezioni` (0009): le lezioni nascono insieme al cliente.
+    for (const lezione of lezioni) {
+      appuntamenti.push({
+        id: uid("app"),
+        owner_id: SESSIONE_SEED.userId,
+        client_id: nuovo.id,
+        ...lezione,
+        created_at: ora(),
+        updated_at: ora(),
+      });
+    }
     return attesa(nuovo);
   },
 
@@ -278,6 +301,12 @@ const clientiFixtures: ClientiApi = {
     const cliente = clienti.find((c) => c.id === id);
     if (!cliente)
       throw new ErroreDati("sconosciuto", "Questo cliente non esiste più.");
+    // Come il trigger di 0009: archiviando, gli appuntamenti futuri escono dal calendario.
+    if (cliente.active && !attivo) {
+      rimuoviAppuntamenti(
+        (a) => a.client_id === id && appuntamentoFuturo(a),
+      );
+    }
     cliente.active = attivo;
     cliente.updated_at = ora();
     return attesa({ ...cliente });
@@ -298,6 +327,8 @@ const clientiFixtures: ClientiApi = {
       .filter((s) => s.client_id === id)
       .map((s) => s.id);
     schedeDelCliente.forEach(rimuoviSchedaInMemoria);
+    // …e i suoi appuntamenti (0009).
+    rimuoviAppuntamenti((a) => a.client_id === id);
     clienti.splice(indice, 1);
     await attesa(null);
   },

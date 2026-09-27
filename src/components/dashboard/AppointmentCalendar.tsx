@@ -21,18 +21,20 @@ import {
   ChevronRight,
   Trash2,
 } from "lucide-react";
+import { messaggioErrore } from "@/data";
 import { useClienti } from "@/features/clients/useClients";
 import {
   useAppuntamenti,
   useCreaAppuntamento,
   useEliminaAppuntamento,
-} from "@/features/plans/usePlans";
-import { oggi, toDataISO } from "@/lib/dates";
+} from "@/features/appointments/useAppointments";
+import { oggi, parseDataISO, toDataISO } from "@/lib/dates";
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { Errore } from "@/components/ui/Stato";
-import type { AppuntamentoInput } from "@/types/domain";
+import { useToast } from "@/components/ui/Toast";
+import type { Appuntamento, AppuntamentoInput } from "@/types/domain";
 
 const NOMI_GIORNI = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
 
@@ -40,33 +42,81 @@ function meseISO(data: Date): string {
   return format(data, "yyyy-MM");
 }
 
+/** Data e ora locali dell'appuntamento, senza passare dal parsing UTC di `new Date(iso)`. */
+function parseISODataOra(appuntamento: Appuntamento): Date {
+  const giorno = parseDataISO(appuntamento.appointment_date) ?? oggi();
+  const [ore, minuti] = appuntamento.start_time.split(":").map(Number);
+  return new Date(
+    giorno.getFullYear(),
+    giorno.getMonth(),
+    giorno.getDate(),
+    ore,
+    minuti,
+  );
+}
+
 export function AppointmentCalendar() {
   const [mese, setMese] = useState(() => startOfMonth(oggi()));
   const [giornoSelezionato, setGiornoSelezionato] = useState(() => oggi());
   const [dialogAperto, setDialogAperto] = useState(false);
+  // Cambia a ogni apertura: rimonta il dialog, che riparte con i campi vuoti.
+  const [aperture, setAperture] = useState(0);
+  const [daEliminare, setDaEliminare] = useState<Appuntamento | null>(null);
+  const toast = useToast();
   const meseCorrente = meseISO(mese);
   const appuntamenti = useAppuntamenti(meseCorrente);
-  const clienti = useClienti({ stato: "attivi" });
-  const crea = useCreaAppuntamento(meseCorrente);
-  const elimina = useEliminaAppuntamento(meseCorrente);
+  // Tutti, non solo gli attivi: gli appuntamenti passati di un cliente
+  // archiviato restano in calendario e devono ancora mostrarne il nome.
+  const clienti = useClienti({ stato: "tutti" });
+  const clientiAttivi = (clienti.data ?? []).filter((c) => c.active);
+  const nomiClienti = new Map(
+    (clienti.data ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`]),
+  );
+  const crea = useCreaAppuntamento();
+  const elimina = useEliminaAppuntamento();
   const giorni = eachDayOfInterval({
     start: startOfWeek(startOfMonth(mese), { weekStartsOn: 1 }),
     end: endOfWeek(endOfMonth(mese), { weekStartsOn: 1 }),
   });
-  const selezionati = (appuntamenti.data ?? []).filter((appuntamento) =>
-    isSameDay(
-      new Date(`${appuntamento.appointment_date}T12:00:00`),
-      giornoSelezionato,
-    ),
+  const isoSelezionato = toDataISO(giornoSelezionato);
+  const selezionati = (appuntamenti.data ?? []).filter(
+    (appuntamento) => appuntamento.appointment_date === isoSelezionato,
   );
+  // I giorni passati si possono aprire per consultarli, non per aggiungervi appuntamenti.
+  const selezionatoPassato = isBefore(giornoSelezionato, startOfDay(oggi()));
 
   const vaiAlMese = (nuovoMese: Date) => {
     setMese(startOfMonth(nuovoMese));
     setGiornoSelezionato(nuovoMese);
   };
 
+  const apriDialog = () => {
+    setAperture((n) => n + 1);
+    setDialogAperto(true);
+  };
+
   const salva = (input: AppuntamentoInput) => {
-    crea.mutate(input, { onSuccess: () => setDialogAperto(false) });
+    crea.mutate(input, {
+      onSuccess: () => {
+        setDialogAperto(false);
+        toast.conferma("Appuntamento salvato.");
+      },
+      onError: (errore) => toast.errore(messaggioErrore(errore)),
+    });
+  };
+
+  const confermaEliminazione = () => {
+    if (!daEliminare) return;
+    elimina.mutate(daEliminare.id, {
+      onSuccess: () => {
+        setDaEliminare(null);
+        toast.conferma("Appuntamento eliminato.");
+      },
+      onError: (errore) => {
+        setDaEliminare(null);
+        toast.errore(messaggioErrore(errore));
+      },
+    });
   };
 
   return (
@@ -90,9 +140,14 @@ export function AppointmentCalendar() {
           variante="primario"
           dimensione="sm"
           aria-label="Nuovo appuntamento"
-          title="Nuovo appuntamento"
+          title={
+            selezionatoPassato
+              ? "Seleziona oggi o un giorno futuro per aggiungere un appuntamento"
+              : "Nuovo appuntamento"
+          }
           className="h-9 w-9 !p-0"
-          onClick={() => setDialogAperto(true)}
+          disabled={selezionatoPassato}
+          onClick={apriDialog}
         >
           <CalendarPlus aria-hidden="true" size={16} />
         </Button>
@@ -144,7 +199,7 @@ export function AppointmentCalendar() {
             ))}
             {giorni.map((giorno) => {
               const iso = toDataISO(giorno);
-              const disabilitato = isBefore(giorno, startOfDay(oggi()));
+              const passato = isBefore(giorno, startOfDay(oggi()));
               const eventi = (appuntamenti.data ?? []).filter(
                 (appuntamento) => appuntamento.appointment_date === iso,
               );
@@ -153,9 +208,8 @@ export function AppointmentCalendar() {
                 <button
                   type="button"
                   key={iso}
-                  disabled={disabilitato}
                   onClick={() => setGiornoSelezionato(giorno)}
-                  className={`min-h-20 border-b border-r border-line p-2 text-left transition-colors hover:bg-accent/10 ${!isSameMonth(giorno, mese) || disabilitato ? "text-muted/40" : "text-ink"} ${selezionato ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}
+                  className={`min-h-20 border-b border-r border-line p-2 text-left transition-colors hover:bg-accent/10 ${!isSameMonth(giorno, mese) || passato ? "text-muted/40" : "text-ink"} ${selezionato ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}
                 >
                   <span
                     className={`nums inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs ${isSameDay(giorno, oggi()) ? "bg-accent font-semibold text-[#0b0d0e]" : ""}`}
@@ -218,13 +272,9 @@ export function AppointmentCalendar() {
                       {evento.start_time.slice(0, 5)} ·{" "}
                       {evento.duration_minutes} min
                     </p>
-                    {evento.client_id ? (
+                    {evento.client_id && nomiClienti.has(evento.client_id) ? (
                       <p className="mt-1 truncate text-xs text-muted">
-                        {clienti.data?.find(
-                          (cliente) => cliente.id === evento.client_id,
-                        )
-                          ? `${clienti.data.find((cliente) => cliente.id === evento.client_id)?.first_name} ${clienti.data.find((cliente) => cliente.id === evento.client_id)?.last_name}`
-                          : "Cliente archiviato"}
+                        {nomiClienti.get(evento.client_id)}
                       </p>
                     ) : null}
                   </div>
@@ -232,7 +282,7 @@ export function AppointmentCalendar() {
                     type="button"
                     aria-label={`Elimina ${evento.title}`}
                     title="Elimina appuntamento"
-                    onClick={() => elimina.mutate(evento.id)}
+                    onClick={() => setDaEliminare(evento)}
                     className="text-muted hover:text-scaduta"
                   >
                     <Trash2 aria-hidden="true" size={15} />
@@ -245,12 +295,27 @@ export function AppointmentCalendar() {
       </div>
 
       <AppointmentDialog
+        key={aperture}
         aperto={dialogAperto}
         giorno={giornoSelezionato}
-        clienti={clienti.data ?? []}
+        clienti={clientiAttivi}
         inCorso={crea.isPending}
         onChiudi={() => setDialogAperto(false)}
         onSalva={salva}
+      />
+      <ConfirmDialog
+        aperto={daEliminare !== null}
+        titolo={`Eliminare ${daEliminare?.title ?? "l'appuntamento"}?`}
+        descrizione={
+          daEliminare
+            ? `${format(parseISODataOra(daEliminare), "EEEE d MMMM 'alle' HH:mm", { locale: it })}. Sparisce anche dai calendari iscritti al feed.`
+            : ""
+        }
+        etichettaConferma="Elimina appuntamento"
+        distruttivo
+        inCorso={elimina.isPending}
+        onAnnulla={() => setDaEliminare(null)}
+        onConferma={confermaEliminazione}
       />
     </section>
   );
