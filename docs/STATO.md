@@ -503,6 +503,20 @@ leggibile a un metro di distanza in palestra, e condivide con lo schermo il sist
 - **Feed calendario**: il comando di deploy in §9.6bis non aveva `--no-verify-jwt`, quindi la
   funzione avrebbe risposto 401 alle app di calendario, che non mandano un JWT. Aggiunto.
 
+### Correzione — 0006 falliva con `supabase db push` (completata)
+
+- **Trovato** al primo `supabase db push` sul progetto vero: 0001–0005 applicate, 0006 fallita con
+  `function gen_random_bytes(integer) does not exist`. Il ruolo di login temporaneo della CLI ha
+  nel search_path solo `public`, e pgcrypto su Supabase sta in `extensions`. La prova della Fase
+  9sexies applicava le migrazioni con il search_path del SQL Editor, che `extensions` ce l'ha: per
+  questo non l'aveva visto.
+- **Corretto** 0006: `set search_path = public, extensions` in testa (ripristinato in fondo) e la
+  stessa impostazione sulla funzione `rigenera_token_calendario`. Modificare 0006 è sicuro: non era
+  mai andata a buon fine su nessun database, e la CLI annulla una migrazione fallita.
+- **Verificato** su tre configurazioni di search_path per la connessione che applica le migrazioni
+  (quella del SQL Editor, solo `public` come la CLI, vuoto) più un Postgres con pgcrypto in
+  `public`: tutte e dieci le migrazioni passano, e le 21 operazioni di app, feed e seed riescono.
+
 ---
 
 ## 9. Da fare da te (wiring)
