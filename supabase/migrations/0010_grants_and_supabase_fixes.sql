@@ -48,11 +48,16 @@ to authenticated, service_role;
 -- nello schema `extensions`, e con `set search_path = public` la funzione non
 -- la trova: "function gen_random_bytes(integer) does not exist" al primo
 -- clic su "Genera link" nelle Impostazioni. Il default della colonna
--- calendar_feed_token non ha il problema: Postgres risolve la funzione una
--- volta, quando la colonna viene creata.
+-- calendar_feed_token, una volta creato, non ha il problema: Postgres risolve
+-- la funzione una volta sola, quando la colonna viene creata.
 --
 -- `extensions` in coda al search_path: su un Postgres dove pgcrypto sta in
 -- `public` lo schema non esiste e Postgres lo ignora.
+--
+-- Ora anche 0006 crea la funzione così (e imposta lo stesso search_path per
+-- il default della colonna, che altrimenti faceva fallire `supabase db push`).
+-- La ridefinizione qui resta per i database dove 0006 era già stata applicata
+-- nella versione precedente.
 -- -----------------------------------------------------------------------------
 create or replace function public.rigenera_token_calendario()
 returns text

@@ -4,6 +4,14 @@
 -- va trattato come un segreto rigenerabile, non come l'anon key (pubblica per
 -- definizione) o la password del trainer.
 
+-- gen_random_bytes viene da pgcrypto, che su Supabase sta nello schema
+-- `extensions`. Il SQL Editor lo ha nel search_path, `supabase db push` no (il
+-- suo ruolo di login temporaneo vede solo `public`): senza questa riga la
+-- migrazione fallisce con "function gen_random_bytes(integer) does not
+-- exist". Su un Postgres dove pgcrypto sta in `public` lo schema `extensions`
+-- non esiste e Postgres lo ignora. Ripristinato in fondo al file.
+set search_path = public, extensions;
+
 alter table public.trainer_settings
   add column if not exists calendar_feed_token text unique
     default encode(gen_random_bytes(24), 'hex');
@@ -21,7 +29,7 @@ create or replace function public.rigenera_token_calendario()
 returns text
 language plpgsql
 security invoker
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   nuovo_token text := encode(gen_random_bytes(24), 'hex');
@@ -46,3 +54,5 @@ $$;
 -- l'update/insert non troverebbe/creerebbe nulla di sensato).
 revoke all on function public.rigenera_token_calendario() from public, anon;
 grant execute on function public.rigenera_token_calendario() to authenticated;
+
+reset search_path;
