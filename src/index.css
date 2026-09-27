@@ -65,9 +65,12 @@
 }
 
 @layer base {
+  /* Controlli nativi (date, orari, checkbox) nel tema scuro: senza, le icone
+     del calendario sono nere sul nero e le checkbox restano bianche. */
   html {
     -webkit-text-size-adjust: 100%;
     scrollbar-width: none;
+    color-scheme: dark;
   }
 
   html::-webkit-scrollbar,
@@ -279,6 +282,7 @@ dialog[open].dialog-surface {
   body {
     background: #fff;
     font-size: 10.5pt;
+    color-scheme: light;
   }
 
   /* Niente navigazione, niente azioni: resta solo il foglio. */

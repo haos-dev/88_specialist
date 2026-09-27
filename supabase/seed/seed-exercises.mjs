@@ -33,6 +33,9 @@
  *                          richiede le chiavi
  *   --limit <n>            solo i primi n esercizi (per una prova)
  *   --aggiorna             riscrive anche gli esercizi che esistono già
+ *   --solo-media           ricarica solo le GIF degli esercizi già nel database
+ *                          che non ne hanno una (es. upload falliti), senza
+ *                          toccare nome, gruppo o descrizione
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -51,7 +54,8 @@ import {
 const QUI = path.dirname(fileURLToPath(import.meta.url))
 const BUCKET = 'exercise-media'
 const LOTTO_INSERT = 100
-const UPLOAD_IN_PARALLELO = 6
+const UPLOAD_IN_PARALLELO = 4
+const TENTATIVI_UPLOAD = 4
 const PAGINA_LETTURA = 1000 // il massimo di righe che PostgREST restituisce per richiesta
 
 /* ------------------------------------------------------------- argomenti */
@@ -65,6 +69,7 @@ function valore(nome) {
 
 const dryRun = flag('--dry-run')
 const aggiorna = flag('--aggiorna')
+const soloMedia = flag('--solo-media')
 const limite = valore('--limit') ? Number.parseInt(valore('--limit'), 10) : Infinity
 // PowerShell passa `"C:\cartella\"` come `C:\cartella"`: via le virgolette finali.
 const cartella = path.resolve(
@@ -77,6 +82,7 @@ function esci(messaggio) {
 }
 
 if (Number.isNaN(limite) || limite < 1) esci('--limit vuole un numero maggiore di zero.')
+if (soloMedia && aggiorna) esci('--solo-media e --aggiorna non vanno insieme.')
 
 /* --------------------------------------------------------------- dataset */
 
@@ -234,13 +240,17 @@ async function assicuraBucket(supabase) {
   if (erroreCreazione) esci(`Non riesco a creare il bucket: ${erroreCreazione.message}`)
 }
 
-/** lower(name) → id di tutti gli esercizi già nel database, pagina per pagina. */
+/**
+ * lower(name) → id di tutti gli esercizi già nel database, pagina per pagina,
+ * più gli id di quelli senza media (per --solo-media).
+ */
 async function eserciziEsistenti(supabase) {
   const esistenti = new Map()
+  const senzaMedia = new Set()
   for (let da = 0; ; da += PAGINA_LETTURA) {
     const { data, error } = await supabase
       .from('exercises')
-      .select('id, name')
+      .select('id, name, media_url')
       .order('id')
       .range(da, da + PAGINA_LETTURA - 1)
     if (error) {
@@ -249,8 +259,11 @@ async function eserciziEsistenti(supabase) {
           '  Le migrazioni sono applicate, 0010 compresa? (STATO.md §9.2)',
       )
     }
-    for (const riga of data) esistenti.set(riga.name.toLowerCase(), riga.id)
-    if (data.length < PAGINA_LETTURA) return esistenti
+    for (const riga of data) {
+      esistenti.set(riga.name.toLowerCase(), riga.id)
+      if (!riga.media_url) senzaMedia.add(riga.id)
+    }
+    if (data.length < PAGINA_LETTURA) return { esistenti, senzaMedia }
   }
 }
 
@@ -261,7 +274,7 @@ async function caricaMedia(supabase, esercizio) {
   if (!contentType || !existsSync(percorso)) return null
 
   const contenuto = await readFile(percorso)
-  for (let tentativo = 1; tentativo <= 2; tentativo += 1) {
+  for (let tentativo = 1; tentativo <= TENTATIVI_UPLOAD; tentativo += 1) {
     const { error } = await supabase.storage
       .from(BUCKET)
       // Stessa chiave del percorso nel dataset (videos/0001-xxxx.gif): upsert,
@@ -271,12 +284,17 @@ async function caricaMedia(supabase, esercizio) {
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(esercizio.fileMedia)
       return { url: data.publicUrl, contentType }
     }
-    if (tentativo === 2) {
+    if (tentativo === TENTATIVI_UPLOAD) {
       console.warn(`  ! upload fallito per ${esercizio.fileMedia}: ${error.message}`)
+    } else {
+      // "Too many connections" e 500 sono passeggeri: si aspetta e si riprova.
+      await attendi(1000 * 2 ** (tentativo - 1))
     }
   }
   return null
 }
+
+const attendi = (ms) => new Promise((risolvi) => setTimeout(risolvi, ms))
 
 /** Esegue `lavoro` su tutti gli elementi, al massimo `n` alla volta, in ordine. */
 async function inParallelo(elementi, n, lavoro) {
@@ -312,7 +330,9 @@ async function main() {
   const supabase = creaClient()
   await assicuraBucket(supabase)
 
-  const esistenti = await eserciziEsistenti(supabase)
+  const { esistenti, senzaMedia: idSenzaMedia } = await eserciziEsistenti(supabase)
+  if (soloMedia) return ricaricaMedia(supabase, dataset.selezionati, esistenti, idSenzaMedia)
+
   const { daInserire, daAggiornare, saltati } = pianifica(dataset.selezionati, esistenti, aggiorna)
   console.log(
     `\n  Nel database ci sono già ${esistenti.size} esercizi.` +
@@ -384,6 +404,45 @@ async function main() {
     process.exit(1)
   }
   console.log('  Media © Gym visual (https://gymvisual.com/): l\'attribuzione è salvata su ogni esercizio.\n')
+}
+
+/**
+ * --solo-media: per gli esercizi del dataset già nel database ma senza GIF,
+ * carica il file e aggiorna solo le colonne media. Le modifiche del trainer a
+ * nome, gruppo e descrizione restano come sono.
+ */
+async function ricaricaMedia(supabase, selezionati, esistenti, idSenzaMedia) {
+  const daFare = selezionati
+    .map((e) => ({ ...e, idEsistente: esistenti.get(e.nome.toLowerCase()) }))
+    .filter((e) => e.idEsistente !== undefined && idSenzaMedia.has(e.idEsistente))
+  console.log(
+    `\n  Esercizi nel database senza GIF: ${idSenzaMedia.size}, dal dataset da ricaricare: ${daFare.length}\n`,
+  )
+
+  let aggiornati = 0
+  const falliti = []
+  await inParallelo(daFare, UPLOAD_IN_PARALLELO, async (esercizio) => {
+    const media = await caricaMedia(supabase, esercizio)
+    if (!media) {
+      falliti.push(esercizio.fileMedia ?? esercizio.nome)
+      return
+    }
+    const { media_url, media_type, media_attribution } = rigaEsercizio(esercizio, media)
+    const { error } = await supabase
+      .from('exercises')
+      .update({ media_url, media_type, media_attribution })
+      .eq('id', esercizio.idEsistente)
+    if (error) falliti.push(`${esercizio.nome}: ${error.message}`)
+    else aggiornati += 1
+  })
+
+  console.log(`\n  Fatto: ${aggiornati} GIF aggiunte.`)
+  if (falliti.length) {
+    console.log(`  ${falliti.length} ancora senza GIF: ${falliti.join(', ')}`)
+    console.log('  Rilancia con --solo-media per riprovare.\n')
+    process.exit(1)
+  }
+  console.log('')
 }
 
 main().catch((errore) => {

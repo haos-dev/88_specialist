@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "./Button";
 
 interface DialogProps {
@@ -31,12 +31,17 @@ export function Dialog({
   nascondiScrollbar = false,
 }: DialogProps) {
   const riferimento = useRef<HTMLDialogElement>(null);
+  // Il contenuto si monta solo dopo `showModal()`: l'`autoFocus` di React
+  // chiama `focus()` al montaggio, e su un <dialog> ancora chiuso (quindi
+  // invisibile) non ha effetto. Il focus finirebbe sul contenitore che scorre.
+  const [mostrato, setMostrato] = useState(false);
 
   useEffect(() => {
     const dialog = riferimento.current;
     if (!dialog) return;
     if (aperto && !dialog.open) dialog.showModal();
     if (!aperto && dialog.open) dialog.close();
+    setMostrato(aperto);
   }, [aperto]);
 
   return (
@@ -55,7 +60,7 @@ export function Dialog({
         LARGHEZZE[larghezza],
       ].join(" ")}
     >
-      {aperto && (
+      {aperto && mostrato && (
         <div className="flex max-h-[85vh] flex-col">
           <header className="border-b border-line px-5 pb-3.5 pt-4">
             <h2 id="dialog-titolo" className="display-tight text-lg">
