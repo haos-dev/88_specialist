@@ -7,6 +7,7 @@ import type {
   Esercizio,
   EsercizioInput,
   GiornoEsercizioInput,
+  LezioneInput,
   Impostazioni,
   Riordino,
   Scheda,
@@ -61,11 +62,18 @@ export interface FiltroClienti {
 export interface ClientiApi {
   elenco(filtro: FiltroClienti): Promise<ClienteConSchede[]>;
   dettaglio(id: string): Promise<Cliente | null>;
-  crea(input: ClienteInput): Promise<Cliente>;
+  /**
+   * Con `lezioni` non vuoto le salva in calendario insieme al cliente, in una
+   * sola transazione: o tutto o niente (0009).
+   */
+  crea(input: ClienteInput, lezioni?: LezioneInput[]): Promise<Cliente>;
   aggiorna(id: string, input: ClienteInput): Promise<Cliente>;
-  /** Archivia (false) o riattiva (true). */
+  /**
+   * Archivia (false) o riattiva (true). Archiviando, gli appuntamenti futuri
+   * del cliente escono dal calendario (0009); riattivando non tornano.
+   */
   impostaAttivo(id: string, attivo: boolean): Promise<Cliente>;
-  /** Hard delete: consentito solo su clienti già archiviati (PRD §3.1). */
+  /** Hard delete: consentito solo su clienti già archiviati (PRD §3.1). Porta via schede e appuntamenti. */
   elimina(id: string): Promise<void>;
 }
 

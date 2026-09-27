@@ -12,7 +12,6 @@ import type {
   Riordino,
   SchedaCompleta,
   SchedaInput,
-  AppuntamentoInput,
 } from "@/types/domain";
 import { useSogliaReminder } from "@/features/settings/useSettings";
 
@@ -40,31 +39,6 @@ export function useDashboardSommario() {
   return useQuery({
     queryKey: chiavi.dashboard.sommario(soglia),
     queryFn: () => dati.dashboard.sommario(soglia),
-  });
-}
-
-export function useAppuntamenti(mese: string) {
-  return useQuery({
-    queryKey: chiavi.appuntamenti.elenco(mese),
-    queryFn: () => dati.appuntamenti.elenco(mese),
-  });
-}
-
-export function useCreaAppuntamento(mese: string) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (input: AppuntamentoInput) => dati.appuntamenti.crea(input),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: chiavi.appuntamenti.elenco(mese) }),
-  });
-}
-
-export function useEliminaAppuntamento(mese: string) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => dati.appuntamenti.elimina(id),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: chiavi.appuntamenti.elenco(mese) }),
   });
 }
 

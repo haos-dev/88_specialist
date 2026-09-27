@@ -45,6 +45,7 @@ export default function ClientDetail() {
   const [formCliente, setFormCliente] = useState(false);
   const [formScheda, setFormScheda] = useState(false);
   const [confermaEliminazione, setConfermaEliminazione] = useState(false);
+  const [confermaArchiviazione, setConfermaArchiviazione] = useState(false);
 
   if (cliente.isLoading) return <Caricamento />;
   if (cliente.error)
@@ -76,13 +77,18 @@ export default function ClientDetail() {
     archivia.mutate(
       { id: c.id, attivo: !c.active },
       {
-        onSuccess: () =>
+        onSuccess: () => {
+          setConfermaArchiviazione(false);
           toast.conferma(
             c.active
               ? `${nomeCompleto} è stato archiviato.`
               : `${nomeCompleto} è di nuovo attivo.`,
-          ),
-        onError: (errore) => toast.errore(messaggioErrore(errore)),
+          );
+        },
+        onError: (errore) => {
+          setConfermaArchiviazione(false);
+          toast.errore(messaggioErrore(errore));
+        },
       },
     );
   };
@@ -220,7 +226,11 @@ export default function ClientDetail() {
                 aria-label={c.active ? "Archivia cliente" : "Riattiva cliente"}
                 title={c.active ? "Archivia cliente" : "Riattiva cliente"}
                 className="h-10 w-10 !p-0"
-                onClick={cambiaStato}
+                // Archiviare toglie dal calendario i suoi appuntamenti futuri
+                // (0009), che riattivando non tornano: prima si chiede.
+                onClick={
+                  c.active ? () => setConfermaArchiviazione(true) : cambiaStato
+                }
                 disabled={archivia.isPending}
               >
                 {c.active ? (
@@ -352,9 +362,18 @@ export default function ClientDetail() {
         }
       />
       <ConfirmDialog
+        aperto={confermaArchiviazione}
+        titolo={`Archiviare ${nomeCompleto}?`}
+        descrizione="I suoi appuntamenti futuri vengono tolti dal calendario; quelli passati restano. Se lo riattivi, gli appuntamenti tolti non tornano."
+        etichettaConferma="Archivia"
+        inCorso={archivia.isPending}
+        onAnnulla={() => setConfermaArchiviazione(false)}
+        onConferma={cambiaStato}
+      />
+      <ConfirmDialog
         aperto={confermaEliminazione}
         titolo={`Eliminare ${nomeCompleto}?`}
-        descrizione="Spariscono anche tutte le sue schede di allenamento, e non si possono recuperare."
+        descrizione="Spariscono anche tutte le sue schede di allenamento e i suoi appuntamenti in calendario, e non si possono recuperare."
         etichettaConferma="Elimina definitivamente"
         distruttivo
         inCorso={elimina.isPending}

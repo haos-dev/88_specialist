@@ -43,7 +43,18 @@ export const clientiSupabase: ClientiApi = {
     return (data as Cliente) ?? null
   },
 
-  async crea(input) {
+  async crea(input, lezioni = []) {
+    if (lezioni.length > 0) {
+      // Cliente e lezioni in un'unica transazione Postgres: con due chiamate
+      // separate un errore sulla seconda lascerebbe il cliente senza lezioni.
+      const { data, error } = await supabase().rpc('crea_cliente_con_lezioni', {
+        p_cliente: { ...input },
+        p_lezioni: lezioni.map((l) => ({ ...l })),
+      })
+      if (error) throw traduciErrore(error, 'creare il cliente e le sue lezioni')
+      return data as unknown as Cliente
+    }
+
     // `owner_id` non si passa mai dal client: in Postgres ha
     // `default auth.uid()` e la policy RLS lo verifica in `with check`.
     const { data, error } = await supabase()

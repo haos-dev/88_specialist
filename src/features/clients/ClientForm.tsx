@@ -1,10 +1,26 @@
-import { useForm } from "react-hook-form";
+import {
+  useForm,
+  useWatch,
+  type Control,
+  type FieldErrors,
+  type UseFormRegister,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Dialog";
-import type { Cliente, ClienteInput } from "@/types/domain";
+import { formatData, oggi, toDataISO } from "@/lib/dates";
+import type { Cliente, ClienteInput, LezioneInput } from "@/types/domain";
+import {
+  FINE_MASSIMA_MESI,
+  GIORNI_SETTIMANA,
+  fineMassima,
+  fineProposta,
+  generaLezioni,
+  titoloLezione,
+  type Allenamento,
+} from "./trainingSchedule";
 
 /** Stringa vuota → null: in Postgres "non indicato" è NULL, non ''. */
 const opzionale = z
@@ -22,6 +38,68 @@ function numeroOpzionale(min: number, max: number, messaggio: string) {
       message: messaggio,
     });
 }
+
+/** Una riga per giorno della settimana, nell'ordine di `GIORNI_SETTIMANA`. */
+type RigaGiorno = { attivo: boolean; ora: string };
+
+function allenamentiScelti(righe: RigaGiorno[]): Allenamento[] {
+  return righe.flatMap((riga, i) =>
+    riga.attivo && riga.ora
+      ? [{ giorno: GIORNI_SETTIMANA[i].giorno, ora: riga.ora }]
+      : [],
+  );
+}
+
+/**
+ * Giorni di allenamento, solo alla creazione. Oggetto a sé perché il suo
+ * `superRefine` giri anche quando un altro campo del form è ancora invalido:
+ * una refine sullo schema intero verrebbe saltata.
+ */
+const programma = z
+  .object({
+    giorni: z.array(z.object({ attivo: z.boolean(), ora: z.string() })),
+    fine: z.string(),
+  })
+  .superRefine(({ giorni, fine }, ctx) => {
+    giorni.forEach((riga, i) => {
+      if (riga.attivo && !riga.ora) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["giorni", i, "ora"],
+          message: "Indica l'orario.",
+        });
+      }
+    });
+    if (!giorni.some((riga) => riga.attivo)) return;
+
+    if (!fine) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fine"],
+        message: "Indica fino a quando.",
+      });
+    } else if (fine < toDataISO(oggi())) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fine"],
+        message: "La data di fine è già passata.",
+      });
+    } else if (fine > fineMassima()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fine"],
+        message: `Al massimo ${FINE_MASSIMA_MESI} mesi da oggi.`,
+      });
+    } else if (
+      generaLezioni(allenamentiScelti(giorni), fine, "").length === 0
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fine"],
+        message: "Nessuno dei giorni scelti cade in questo periodo.",
+      });
+    }
+  });
 
 const schema = z.object({
   first_name: z
@@ -44,6 +122,7 @@ const schema = z.object({
   weight_kg: numeroOpzionale(20, 400, "Il peso va tra 20 e 400 kg."),
   goal: opzionale,
   notes: opzionale,
+  programma,
 });
 
 type Campi = z.input<typeof schema>;
@@ -53,7 +132,8 @@ interface ClientFormProps {
   aperto: boolean;
   cliente?: Cliente | null;
   inCorso?: boolean;
-  onSalva: (input: ClienteInput) => void;
+  /** `lezioni` è sempre vuoto in modifica: i giorni si scelgono solo alla creazione. */
+  onSalva: (input: ClienteInput, lezioni: LezioneInput[]) => void;
   onChiudi: () => void;
 }
 
@@ -70,6 +150,7 @@ export function ClientForm({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
     // Il terzo generico è il tipo *dopo* le trasformazioni dello schema:
     // senza, `handleSubmit` consegnerebbe le stringhe grezze invece dei null.
@@ -85,10 +166,24 @@ export function ClientForm({
       weight_kg: cliente?.weight_kg != null ? String(cliente.weight_kg) : "",
       goal: cliente?.goal ?? "",
       notes: cliente?.notes ?? "",
+      programma: {
+        giorni: GIORNI_SETTIMANA.map(() => ({ attivo: false, ora: "" })),
+        fine: fineProposta(),
+      },
     },
   });
 
-  const invia = handleSubmit((campi) => onSalva(campi as ClienteInput));
+  const invia = handleSubmit(({ programma, ...campi }) => {
+    const input = campi as ClienteInput;
+    const lezioni = modifica
+      ? []
+      : generaLezioni(
+          allenamentiScelti(programma.giorni),
+          programma.fine,
+          titoloLezione(input.first_name, input.last_name),
+        );
+    onSalva(input, lezioni);
+  });
 
   const chiudi = () => {
     reset();
@@ -233,6 +328,14 @@ export function ClientForm({
           {(props) => <Textarea {...props} {...register("notes")} rows={4} />}
         </Field>
 
+        {!modifica && (
+          <GiorniAllenamento
+            register={register}
+            control={control}
+            errori={errors.programma}
+          />
+        )}
+
         {/* Permette l'invio con Invio da dentro un campo. */}
         <button
           type="submit"
@@ -244,5 +347,98 @@ export function ClientForm({
         </button>
       </form>
     </Dialog>
+  );
+}
+
+/**
+ * Giorni e orari in cui il cliente si allena: ogni giorno scelto diventa una
+ * lezione di un'ora in calendario, da oggi alla data di fine.
+ */
+function GiorniAllenamento({
+  register,
+  control,
+  errori,
+}: {
+  register: UseFormRegister<Campi>;
+  control: Control<Campi, unknown, CampiPuliti>;
+  errori: FieldErrors<Campi>["programma"];
+}) {
+  const valori = useWatch({ control, name: "programma" });
+  const lezioni = generaLezioni(
+    allenamentiScelti(valori.giorni),
+    valori.fine,
+    "",
+  );
+  const nessunGiorno = !valori.giorni.some((riga) => riga.attivo);
+
+  return (
+    <fieldset className="flex flex-col gap-3 border-t border-line pt-4">
+      <legend className="float-left mb-1 w-full text-sm font-medium text-ink">
+        Giorni di allenamento
+      </legend>
+      <p className="-mt-2 text-xs text-muted">
+        Facoltativo. Ogni giorno scelto diventa una lezione di un&apos;ora in
+        calendario, da oggi alla data di fine.
+      </p>
+
+      <ul className="flex flex-col gap-1">
+        {GIORNI_SETTIMANA.map(({ giorno, nome }, i) => {
+          const attivo = valori.giorni[i]?.attivo;
+          const errore = errori?.giorni?.[i]?.ora?.message;
+          return (
+            <li
+              key={giorno}
+              className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1"
+            >
+              <label className="flex w-28 items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-accent"
+                  {...register(`programma.giorni.${i}.attivo`)}
+                />
+                {nome}
+              </label>
+              {attivo ? (
+                <Input
+                  type="time"
+                  aria-label={`Orario ${nome.toLowerCase()}`}
+                  aria-invalid={Boolean(errore)}
+                  title={errore}
+                  className="!w-36"
+                  {...register(`programma.giorni.${i}.ora`)}
+                />
+              ) : null}
+              {errore ? (
+                <span className="w-full text-xs text-scaduta">{errore}</span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+
+      {!nessunGiorno && (
+        <Field
+          label="Fino al"
+          errore={errori?.fine?.message}
+          aiuto={
+            lezioni.length > 0
+              ? `${lezioni.length} ${lezioni.length === 1 ? "lezione" : "lezioni"}, dal ${formatData(lezioni[0].appointment_date)} al ${formatData(lezioni[lezioni.length - 1].appointment_date)}.`
+              : undefined
+          }
+        >
+          {(props) => (
+            <Input
+              {...props}
+              {...register("programma.fine")}
+              type="date"
+              min={toDataISO(oggi())}
+              max={fineMassima()}
+              className="sm:max-w-48"
+              aria-invalid={Boolean(errori?.fine)}
+            />
+          )}
+        </Field>
+      )}
+    </fieldset>
   );
 }

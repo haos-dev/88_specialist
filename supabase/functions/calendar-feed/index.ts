@@ -51,22 +51,35 @@ function escapeICS(valore: string): string {
     .replace(/\n/g, "\\n");
 }
 
-/** Piega le righe oltre i 75 ottetti con continuazione CRLF+spazio (RFC 5545 §3.1). */
+/**
+ * Piega le righe oltre i 75 ottetti con continuazione CRLF+spazio (RFC 5545 §3.1).
+ *
+ * Il limite è in ottetti UTF-8, non in caratteri: "à" ne occupa due, quindi
+ * tagliare ogni 75 caratteri produceva righe fino a 150 ottetti con titoli e
+ * note in italiano. Si avanza un code point alla volta, così il taglio non
+ * cade mai a metà di un carattere multi-byte.
+ */
 function piegaRiga(riga: string): string {
-  const bytes = new TextEncoder().encode(riga);
-  if (bytes.length <= 75) return riga;
+  const encoder = new TextEncoder();
+  if (encoder.encode(riga).length <= 75) return riga;
 
-  let risultato = "";
-  let indice = 0;
-  let primaRiga = true;
-  while (indice < riga.length) {
-    const limite = primaRiga ? 75 : 74; // la continuazione perde 1 carattere per lo spazio iniziale
-    const pezzo = riga.slice(indice, indice + limite);
-    risultato += (primaRiga ? "" : "\r\n ") + pezzo;
-    indice += limite;
-    primaRiga = false;
+  const pezzi: string[] = [];
+  let pezzo = "";
+  let ottetti = 0;
+  for (const carattere of riga) {
+    // La continuazione inizia con uno spazio, che conta nei 75.
+    const limite = pezzi.length === 0 ? 75 : 74;
+    const dimensione = encoder.encode(carattere).length;
+    if (ottetti + dimensione > limite) {
+      pezzi.push(pezzo);
+      pezzo = "";
+      ottetti = 0;
+    }
+    pezzo += carattere;
+    ottetti += dimensione;
   }
-  return risultato;
+  pezzi.push(pezzo);
+  return pezzi.join("\r\n ");
 }
 
 function formattaDataOra(dataISO: string, oraISO: string): string {

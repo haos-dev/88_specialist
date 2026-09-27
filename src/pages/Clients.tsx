@@ -168,16 +168,22 @@ export default function Clients() {
         aperto={formAperto}
         inCorso={crea.isPending}
         onChiudi={chiudiForm}
-        onSalva={(input) =>
-          crea.mutate(input, {
-            onSuccess: (cliente) => {
-              setFormAperto(false);
-              toast.conferma(
-                `${cliente.first_name} ${cliente.last_name} è stato creato.`,
-              );
+        onSalva={(input, lezioni) =>
+          crea.mutate(
+            { input, lezioni },
+            {
+              onSuccess: (cliente) => {
+                setFormAperto(false);
+                const nome = `${cliente.first_name} ${cliente.last_name}`;
+                toast.conferma(
+                  lezioni.length === 0
+                    ? `${nome} è stato creato.`
+                    : `${nome} è stato creato, con ${lezioni.length} ${lezioni.length === 1 ? "lezione" : "lezioni"} in calendario.`,
+                );
+              },
+              onError: (errore) => toast.errore(messaggioErrore(errore)),
             },
-            onError: (errore) => toast.errore(messaggioErrore(errore)),
-          })
+          )
         }
       />
     </>
