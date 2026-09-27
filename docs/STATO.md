@@ -11,7 +11,10 @@
 Tutta l'interfaccia è costruita e funzionante sui dati di esempio: `npm install && npm run dev`
 apre un'app cliccabile in ogni sua schermata, senza bisogno di alcun backend. Il codice che parla
 con Supabase è scritto per intero — query, mutation, riordino batch, rinnovo — ma non è mai stato
-eseguito contro un database vero, perché il progetto Supabase non esiste ancora.
+eseguito contro un database vero, perché il progetto Supabase non esiste ancora. Le migrazioni
+sono state però applicate e provate su un Postgres configurato come un progetto Supabase nuovo
+(vedi Fase 9sexies in §8). Il repository è già collegato a Vercel, che pubblica un'anteprima per
+ogni pull request; manca il collegamento a Supabase.
 
 **Quello che manca è il wiring: vedi §9 in fondo.**
 
@@ -31,7 +34,7 @@ eseguito contro un database vero, perché il progetto Supabase non esiste ancora
 | PWA          | `vite-plugin-pwa`, manifest + service worker, **solo app shell in cache** |
 | Backend      | Supabase (Postgres + Auth + Storage) — **non ancora creato**              |
 | Test         | Vitest, solo logica pura — **nessun test contro database**                |
-| Deploy       | hosting statico, `vercel.json` già scritto — **non ancora collegato**     |
+| Deploy       | Vercel, collegato al repository — **non ancora collegato a Supabase**     |
 
 Niente Electron, niente SQLite, niente sync via git, niente protocollo `media://`: tutti problemi
 della v2, non applicabili qui.
@@ -46,7 +49,7 @@ allineati alle migrazioni (o rigenerati, vedi §9).
 ## 2. Mappa dei file
 
 ```
-PRD.md  STATO.md            documenti (alla radice, non in docs/)
+docs/PRD.md  docs/STATO.md  documenti
 index.html  vite.config.ts  tsconfig*.json  eslint.config.js  vercel.json
 .env.example                → copiare in .env
 
@@ -75,6 +78,7 @@ src/
     types.ts                il contratto che entrambi rispettano
     errors.ts               traduzione errori Postgres → italiano
     supabase/               auth.ts clienti.ts esercizi.ts schede.ts impostazioni.ts
+                            appuntamenti.ts dashboard.ts
     fixtures/               dati.ts + index.ts (cancellabili in un commit)
 
   features/
@@ -82,6 +86,7 @@ src/
                             trainingSchedule.ts          ← logica pura, testata
     appointments/           useAppointments.ts
     exercises/              useExercises.ts  ExerciseForm.tsx  ExercisePicker.tsx
+                            ExerciseLibraryDialog.tsx    ← la libreria, aperta da Templates
     plans/                  usePlans.ts  PlanForm.tsx  TemplateForm.tsx  RenewDialog.tsx
                             ApplyTemplateDialog.tsx  PlanHeading.tsx
                             DayCard.tsx  ExerciseRow.tsx  DragHandle.tsx
@@ -91,17 +96,18 @@ src/
 
   components/
     layout/                 AppLayout  Sidebar  PageHeader  OfflineBanner
+    dashboard/              AppointmentCalendar
     auth/                   AuthProvider  ProtectedRoute
     ui/                     Button  buttonStyles  Field(+Input/Select/Textarea)
                             Table  Badge  Dialog(+ConfirmDialog)  SearchInput
                             Stato(caricamento/vuoto/errore)  Toast
 
   pages/
-    Login  Dashboard  Clients  ClientDetail  Exercises
+    Login  Dashboard  Clients  ClientDetail  Templates
     WorkoutBuilder  PrintPlan  Settings  NotFound
 
 supabase/
-  migrations/               0001_schema … 0009_client_lessons (vedi §9.2 per l'elenco completo)
+  migrations/               0001_schema … 0010_grants_and_supabase_fixes (elenco completo in §9.2)
   functions/calendar-feed/  Edge Function, feed .ics (§3.7)
   seed/seed-exercises.mjs   script locale, service_role key
 
@@ -120,10 +126,16 @@ Sette tabelle: `clients`, `exercises`, `workout_plans`, `workout_days`, `workout
 `exercises`, che è la libreria condivisa e ha una policy "tutto agli autenticati, niente agli
 anonimi".
 
+**Grant espliciti (0010).** I progetti Supabase creati dal 30 maggio 2026 non concedono più in
+automatico l'accesso alle tabelle di `public` ai ruoli della Data API: senza `grant`, ogni query
+risponde "permission denied" prima ancora della RLS. 0010 concede select/insert/update/delete su
+tutte e sette le tabelle ad `authenticated` (l'app) e `service_role` (feed .ics e seed), niente ad
+`anon`. **Una tabella nuova va aggiunta lì**, o l'app non la vedrà.
+
 **Fonte di verità: `supabase/migrations/`.** PRD §7 è stato aggiornato per corrispondervi.
 Nessuna migrazione è stata ancora applicata: non esiste un database.
 
-**Due aggiunte non ancora nel database reale, solo in migrazioni scritte (0007)**:
+**Aggiunte di 0007** (come tutte le altre, non ancora applicate a un database reale):
 
 - `clients`: `height_cm`, `weight_kg`, `goal` (tutti opzionali, con check di range largo — vedi
   PRD §3.1/§7).
@@ -145,6 +157,7 @@ Le migrazioni contengono anche funzioni Postgres chiamate dall'app via `rpc()`:
 | `riordina_esercizi(day_id, ids[], posizioni[])`                  | Idem, e il vincolo su `day_id` rende impossibile spostare un esercizio in un altro giorno (PRD §3.3).                                               |
 | `rigenera_token_calendario()`                                    | Ruota `trainer_settings.calendar_feed_token` (PRD §3.7); gestisce anche il caso "la riga non esiste ancora" come A7.                                |
 | `applica_template(template_id, client_id, titolo, inizio, fine)` | Gemella di `rinnova_scheda`, ma verso un `client_id` di destinazione diverso dall'origine (0007, PRD §3.3bis).                                      |
+| `crea_cliente_con_lezioni(cliente, lezioni)`                     | Cliente + lezioni in calendario in una transazione (0009, PRD §3.1): o tutto o niente.                                                              |
 
 Tutte `security invoker` più `revoke`/`grant` espliciti (solo `authenticated`): le policy RLS
 continuano ad applicarsi e nessuna è chiamabile da `anon`.
@@ -162,7 +175,7 @@ backend.
 | ----------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | auth              | `sessioneCorrente` `accedi` `esci` `osservaSessione`                                                        | `data/supabase/auth.ts`                                    |
 | clienti           | `elenco` `dettaglio` `crea` `aggiorna` `impostaAttivo` `elimina`                                            | `data/supabase/clienti.ts`                                 |
-| esercizi          | `elenco`(paginato) `dettaglio` `crea` `aggiorna` `impostaArchiviato` `utilizzi` `elimina` `gruppiMuscolari` | `data/supabase/esercizi.ts`                                |
+| esercizi          | `elenco`(paginato) `dettaglio` `crea` `aggiorna` `utilizzi` `elimina` `gruppiMuscolari`                     | `data/supabase/esercizi.ts`                                |
 | schede            | `elencoPerCliente` `inScadenza` `dettaglio` `crea` `aggiorna` `impostaStato` `elimina` `rinnova`            | `data/supabase/schede.ts`                                  |
 | schede → giorni   | `aggiungiGiorno` `rinominaGiorno` `eliminaGiorno` `riordinaGiorni`                                          | idem                                                       |
 | schede → esercizi | `aggiungiEsercizio` `aggiornaEsercizio` `rimuoviEsercizio` `riordinaEsercizi`                               | idem                                                       |
@@ -199,9 +212,11 @@ Con `VITE_USE_FIXTURES=true` (il default), tutto:
 - **Dettaglio cliente** — layout a griglia responsive, azioni (modifica/archivia/elimina) con
   icone, anagrafica e note in evidenza (altezza/peso/obiettivo mostrati solo se compilati),
   elenco delle sue schede con stato e scadenza.
-- **Esercizi** — griglia paginata con ricerca e filtro per gruppo muscolare, CRUD completo, e il
-  controllo "in uso in N schede" prima di eliminare, che propone l'archiviazione al suo posto.
-- **Template di allenamento** — sezione a fondo pagina Esercizi (0007, PRD §3.3bis): crea/
+- **Libreria esercizi** — un dialog aperto dalla pagina Templates ("Libreria esercizi"): griglia
+  paginata con ricerca e filtro per gruppo muscolare, CRUD completo, e il controllo "in uso in N
+  righe di scheda" prima di eliminare, che in quel caso blocca l'eliminazione. Non c'è più una
+  pagina Esercizi a sé.
+- **Template di allenamento** — pagina Templates in navigazione (0007, PRD §3.3bis): crea/
   modifica/elimina un template (stesso builder di giorni/esercizi delle schede vere, senza date
   né stato), "Applica a un cliente" (sceglie cliente + titolo + date, crea una scheda vera via
   `applica_template`), eliminazione diretta senza il vincolo "solo se archiviato" (un template
@@ -256,6 +271,7 @@ hanno un file di test dedicato; il wiring dati non lo ha mai avuto neanche per R
 - [x] Fase 9ter — Campi corporei cliente + Template di allenamento _(0007, non ancora applicata)_
 - [x] Fase 9quinquies — Giorni di allenamento → lezioni in calendario + correzioni audit
       _(0009, non ancora applicata)_
+- [x] Fase 9sexies — Migrazioni pronte per un progetto Supabase nuovo (0010) + pulizia
 - [ ] Fase 10 — **Deploy e wiring** → §9
 
 ---
@@ -267,6 +283,10 @@ Le motivazioni complete stanno in **PRD §9**. Qui il promemoria operativo:
 - **RLS attiva su tutte le tabelle**, `exercises` inclusa (con policy diversa: condivisa, non
   per-utente). Con RLS spenta l'API PostgREST è leggibile da chiunque abbia la anon key, che è
   nel bundle del browser per costruzione.
+- **Grant espliciti su ogni tabella (0010).** Su un progetto Supabase nuovo una tabella senza
+  `grant` è invisibile alla Data API. Nessun grant ad `anon`: l'app richiede sempre il login.
+- **Funzioni con `set search_path`: includere `extensions`** se usano pgcrypto
+  (`gen_random_bytes`): su Supabase l'estensione vive lì, non in `public`.
 - **La anon key è pubblica, la `service_role key` no.** La prima va in `.env` come `VITE_*` e
   finisce nel bundle: è normale. La seconda esiste solo nell'ambiente in cui gira lo script di
   seed. Tutto ciò che inizia per `VITE_` è pubblico.
@@ -279,7 +299,8 @@ Le motivazioni complete stanno in **PRD §9**. Qui il promemoria operativo:
   la query (`.eq('active', false)`), non solo nella UI: se la riga non è archiviata la delete non
   trova niente.
 - **Un esercizio in uso non si elimina**, la FK è `on delete restrict`. La UI conta gli utilizzi
-  e propone l'archiviazione. Cancellarlo davvero riscriverebbe le schede passate dei clienti.
+  e, se è usato, non offre l'eliminazione. Cancellarlo davvero riscriverebbe le schede passate
+  dei clienti. (La colonna `exercises.archived` esiste ma oggi l'app non la usa.)
 - **Drag&drop solo dentro il proprio contenitore.** Un trascinamento che attraversa i confini
   viene ignorato, e la funzione Postgres lo rende impossibile anche a livello di dati.
 - **Nessun offline vero per i dati.** Il service worker mette in cache solo l'app shell:
@@ -290,18 +311,20 @@ Le motivazioni complete stanno in **PRD §9**. Qui il promemoria operativo:
 
 ### Il sistema visivo, in breve
 
-Tutto sta in `src/index.css`. L'idea: il vero output dell'app è un foglio A4 letto a un metro di
-distanza in palestra, quindi lo schermo prende in prestito la logica del documento — **righe e
-filetti, non card** — e app e stampa condividono lo stesso sistema tipografico.
+Tutto sta in `src/index.css`. Lo schermo è uno studio scuro, "dark studio workspace": superfici
+quasi nere, testo caldo, un solo accento arancione. La stampa resta un foglio A4 chiaro,
+leggibile a un metro di distanza in palestra, e condivide con lo schermo il sistema tipografico.
 
-- **Colore**: `paper #F6F7F5` · `surface #FFF` · `ink #14201D` · `muted #63736E` · `line #DCE2DE`
-  · `accent #0E5C52` · `teal #2E9C8A`, più `scaduta #B3261E` e `scadenza #A96A05` come soli
-  segnali funzionali.
+- **Colore**: `paper #0B0D0E` (canvas) · `surface #15191B` · `ink #F5F1EB` · `muted #A7ACA9` ·
+  `line #303638` · `line-strong #59615F` · `accent #FF6B1A` (azioni e brand; `teal` è un alias
+  arancione per gli stati attivi), più `scaduta #FF796F` e `scadenza #F2B84B` come soli segnali
+  funzionali. Il vetro (`glass`) è riservato al chrome, come la barra di navigazione, mai ai dati.
 - **Tipografia**: una sola famiglia, **Archivo** variabile. È l'asse di larghezza a fare il lavoro
   espressivo — i titoli girano allargati (`.display`, `.display-tight`), il testo resta a
   larghezza normale. Cifre sempre tabulari.
-- **Forma**: raggio 3px su bottoni e input, **0** sui contenitori — il raggio dice "ci puoi
-  interagire". Nessuna ombra, da nessuna parte.
+- **Forma**: raggio 10px su bottoni e input (`--radius-control`), 12–25px su card e
+  contenitori. Clienti, template e widget della dashboard sono card. Un'ombra sola, quella dei
+  dialog (`--shadow-dialog`).
 - **Movimento**: solo in risposta a un'azione (trascinare, aprire un dialog). `prefers-reduced-motion`
   rispettato.
 - **Stampa**: il blocco `@media print` ridefinisce i _token_, non i singoli bordi — così la
@@ -430,6 +453,29 @@ filetti, non card** — e app e stampa condividono lo stesso sistema tipografico
 - **Non fatto**: modificare o rigenerare in seguito il programma di un cliente; nessuna prova
   contro un progetto Supabase vero (non esiste ancora).
 
+### Fase 9sexies — Migrazioni pronte per Supabase + pulizia (completata)
+
+- **Trovato** applicando 0001–0009 a un Postgres configurato come un progetto Supabase creato
+  oggi (PGlite, pgcrypto nello schema `extensions`, ruoli `anon`/`authenticated`/`service_role`
+  senza grant di default):
+  - ogni query dell'app, del feed e del seed falliva con `permission denied for table …`. Dal
+    30 maggio 2026 i progetti nuovi non concedono più l'accesso alle tabelle in automatico;
+  - `rigenera_token_calendario` (0006) falliva con `function gen_random_bytes(integer) does not
+    exist`: ha `set search_path = public` e su Supabase pgcrypto sta in `extensions`.
+- **Aggiunto** `0010_grants_and_supabase_fixes.sql`: grant espliciti ad `authenticated` e
+  `service_role` su tutte le tabelle, niente ad `anon`; `rigenera_token_calendario` ridefinita
+  con `search_path = public, extensions`. Rieseguita la stessa prova: 21 operazioni su 21 (CRUD
+  di ogni tabella, ogni RPC, trigger di archiviazione, cascade, letture del feed, insert del
+  seed) riuscite; `anon` respinto su tabelle e funzioni. Riprovata anche su un Postgres semplice
+  con pgcrypto in `public`: nessuna regressione.
+- **Dashboard**: il saluto aveva un `<h1>` dentro un altro `<h1>` (HTML non valido, React lo
+  segnalava in console). Ora è un solo `<h1>` con uno span. Nello stesso header il bottone
+  "Nuovo cliente" era un `<button>` dentro un `<a>`, altro annidamento non valido: ora è un
+  `<Link>` con `classiBottone`, come in NotFound.
+- **Documenti riallineati al codice**: sistema visivo (tema scuro, accento arancione, card),
+  pagina Templates al posto della pagina Esercizi (la libreria è un dialog), nessuna
+  archiviazione degli esercizi, mappa dei file, Vercel già collegato, PRD §3.3bis e §6.2.
+
 ---
 
 ## 9. Da fare da te (wiring)
@@ -466,9 +512,25 @@ supabase/migrations/0006_calendar_feed.sql
 supabase/migrations/0007_client_metrics_and_templates.sql
 supabase/migrations/0008_remove_trainer_profile_settings.sql
 supabase/migrations/0009_client_lessons.sql
+supabase/migrations/0010_grants_and_supabase_fixes.sql
 ```
 
-Con la CLI: `npx supabase link --project-ref <ref>` e poi `npx supabase db push`.
+**Non saltare la 0010**: su un progetto creato dal 30 maggio 2026 senza quei `grant` l'app
+risponde "permission denied" a ogni schermata, e "Genera link" del feed calendario fallisce.
+
+Con la CLI: `npx supabase link --project-ref <ref>` e poi `npx supabase db push`. Se la CLI
+lamenta la mancanza di `supabase/config.toml`, crealo prima con `npx supabase init`.
+
+Verifica veloce dopo averle applicate, sempre dal SQL Editor: questa query deve restituire 14
+righe, sette tabelle per ciascuno dei due ruoli:
+
+```sql
+select table_name, grantee
+  from information_schema.role_table_grants
+ where table_schema = 'public' and privilege_type = 'SELECT'
+   and grantee in ('authenticated', 'service_role')
+ order by 1, 2;
+```
 
 ### 9.3 Chiudi la registrazione e crea l'account
 
@@ -543,8 +605,9 @@ Desktop e `npx supabase start` (istanza locale), **mai** il progetto di produzio
 
 ### 9.8 Deploy
 
-1. Collega il repository a Vercel. `vercel.json` è già scritto: comando di build, cartella di
-   output, e il rewrite SPA senza cui `/schede/<id>/stampa` darebbe 404 se aperta direttamente.
+1. ~~Collega il repository a Vercel~~ — fatto: Vercel pubblica già un'anteprima per ogni pull
+   request. `vercel.json` contiene comando di build, cartella di output e il rewrite SPA senza
+   cui `/schede/<id>/stampa` darebbe 404 se aperta direttamente.
 2. **Environment Variables** su Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
    `VITE_USE_FIXTURES=false`.
 3. **Authentication → URL Configuration** su Supabase: aggiungi il dominio Vercel a Site URL e

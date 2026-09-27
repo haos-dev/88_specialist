@@ -102,7 +102,7 @@ sono costruite sotto, non cosa fanno per il trainer.)_
 ### 3.3bis Template di Allenamento
 
 - Il trainer può creare **template**: strutture di giorni/esercizi riutilizzabili, non legate a
-  nessun cliente, che vive nella pagina Esercizi (concettualmente è materiale di libreria, come
+  nessun cliente, che vive nella pagina Templates (concettualmente è materiale di libreria, come
   gli esercizi stessi — non appartiene a un cliente specifico più di quanto lo faccia un
   esercizio).
 - Un template è modellato **come una Scheda con `client_id = null` e `is_template = true`**, non
@@ -220,6 +220,10 @@ sono costruite sotto, non cosa fanno per il trainer.)_
   produzione.
 
 ### 6.2 Struttura cartelle (indicativa)
+
+> Struttura del piano iniziale, in JavaScript. Il progetto è poi stato scritto in TypeScript, e
+> la pagina Esercizi è diventata un dialog aperto dalla pagina Templates: la mappa reale dei file
+> è in STATO.md §2.
 
 ```
 src/

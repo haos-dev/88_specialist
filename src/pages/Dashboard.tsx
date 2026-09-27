@@ -1,7 +1,7 @@
 import { CircleAlert, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AppointmentCalendar } from "@/components/dashboard/AppointmentCalendar";
-import { Button } from "@/components/ui/Button";
+import { classiBottone } from "@/components/ui/buttonStyles";
 import { Errore } from "@/components/ui/Stato";
 import { calcolaScadenza, ordinaPerUrgenza } from "@/features/plans/planExpiry";
 import {
@@ -35,23 +35,23 @@ export default function Dashboard() {
       <header className="mb-8 flex flex-wrap items-end justify-between gap-5 border-b border-line pb-5">
         <div>
           <div>
+            {/* Un solo h1: il nome va a capo con uno span `block`, non con un h1 annidato. */}
             <h1 className="display text-4xl leading-none text-ink sm:text-3xl">
               Ciao,{" "}
-              <h1 className="display text-4xl leading-none text-accent sm:text-5xl">
+              <span className="block text-4xl text-accent sm:text-5xl">
                 Giovanni!
-              </h1>
+              </span>
             </h1>
           </div>
         </div>
-        <Link to="/clienti?nuovo=1">
-          <Button
-            variante="primario"
-            aria-label="Nuovo cliente"
-            title="Nuovo cliente"
-            className="h-11 w-11 !p-0"
-          >
-            <UserPlus aria-hidden="true" size={18} strokeWidth={2.2} />
-          </Button>
+        {/* Un link con l'aspetto di un bottone, non un <button> dentro un <a>. */}
+        <Link
+          to="/clienti?nuovo=1"
+          aria-label="Nuovo cliente"
+          title="Nuovo cliente"
+          className={classiBottone("primario", "md", "h-11 w-11 !p-0")}
+        >
+          <UserPlus aria-hidden="true" size={18} strokeWidth={2.2} />
         </Link>
       </header>
 
