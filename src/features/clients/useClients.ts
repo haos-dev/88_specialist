@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { dati, type FiltroClienti } from '@/data'
 import { chiavi } from '@/lib/queryClient'
-import type { ClienteInput, LezioneInput } from '@/types/domain'
+import type { ClienteInput, LezioneInput, PreferenzeAllenamentoInput } from '@/types/domain'
 
 export function useClienti(filtro: FiltroClienti) {
   return useQuery({
@@ -44,6 +44,18 @@ export function useAggiornaCliente() {
       dati.clienti.aggiorna(id, input),
     onSuccess: (_cliente, { id }) => invalidaClienti(client, id),
   })
+}
+
+export function useAggiornaPreferenzeAllenamento() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, preferenze }: { id: string; preferenze: PreferenzeAllenamentoInput }) =>
+      dati.clienti.aggiornaPreferenzeAllenamento(id, preferenze),
+    onSuccess: (_result, { id }) => {
+      client.invalidateQueries({ queryKey: chiavi.appuntamenti.tutti });
+      invalidaClienti(client, id);
+    },
+  });
 }
 
 export function useArchiviaCliente() {

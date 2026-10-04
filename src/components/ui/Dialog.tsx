@@ -79,7 +79,7 @@ export function Dialog({
             {children}
           </div>
 
-          <footer className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">
+          <footer className="flex flex-wrap justify-end gap-2 px-5 py-3">
             {azioni ?? <Button onClick={onChiudi}>Chiudi</Button>}
           </footer>
         </div>

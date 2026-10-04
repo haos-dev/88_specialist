@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { Minus } from "lucide-react";
+import { Textarea } from "@/components/ui/Field";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/cn";
 import type {
@@ -75,7 +76,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
       data-print-row
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "flex flex-wrap items-center gap-2 border-b border-line py-1.5",
+        "grid grid-cols-[auto_3rem_minmax(4rem,1fr)_auto_minmax(5rem,1fr)_auto] items-center gap-2 border-b border-line py-1.5",
         isDragging &&
           "relative z-10 bg-surface opacity-90 shadow-dialog [will-change:transform]",
       )}
@@ -101,7 +102,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
         />
       )}
 
-      <div className="min-w-0 flex-1 basis-40">
+      <div className="min-w-0">
         <p className="truncate text-sm font-medium" title={riga.esercizio.name}>
           {riga.esercizio.name}
         </p>
@@ -110,7 +111,7 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
         </p>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <label className="sr-only" htmlFor={`sets-${riga.id}`}>
           Serie per {riga.esercizio.name}
         </label>
@@ -156,6 +157,21 @@ export function ExerciseRow({ riga, onAggiorna, onRimuovi }: ExerciseRowProps) {
         <span aria-hidden="true" className="w-3 text-xs text-muted">
           {bozza.rest ? "″" : ""}
         </span>
+        <label className="sr-only" htmlFor={`notes-${riga.id}`}>
+          Note per {riga.esercizio.name}
+        </label>
+        <Textarea
+          id={`notes-${riga.id}`}
+          value={bozza.notes}
+          onChange={(e) => setBozza((b) => ({ ...b, notes: e.target.value }))}
+          onBlur={salva}
+          placeholder="Note"
+          rows={2}
+          className={cn(
+            CAMPO,
+            "!h-[3rem] !min-h-[3rem] !max-h-[3rem] w-full min-w-0 resize-none overflow-y-auto py-1 text-xs leading-4",
+          )}
+        />
       </div>
 
       <button

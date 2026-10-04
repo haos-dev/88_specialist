@@ -33,6 +33,8 @@ export type ClientRow = {
   weight_kg: number | null;
   goal: string | null;
   notes: string | null;
+  training_days: { giorno: number; ora: string }[] | null;
+  training_until: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -213,6 +215,11 @@ export type Database = {
       crea_cliente_con_lezioni: {
         Args: { p_cliente: Json; p_lezioni: Json };
         Returns: ClientRow;
+      };
+      /** Replaces all future appointments for a client and inserts the new weekly schedule atomically (0011). */
+      sostituisci_lezioni_cliente: {
+        Args: { p_client_id: string; p_lezioni: Json; p_training_days: Json; p_training_until: string | null };
+        Returns: undefined;
       };
       /** Riscrive in un colpo solo le posizioni cambiate da un drag&drop (audit B2). */
       riordina_giorni: {

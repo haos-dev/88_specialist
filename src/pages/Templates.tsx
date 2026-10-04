@@ -73,7 +73,7 @@ export default function Templates() {
                 title="Nuovo template"
                 onClick={() => setTemplateFormAperto(true)}
               >
-                <FilePlusCorner aria-hidden="true" size={19} strokeWidth={2.2} />
+                Nuovo template
               </Button>
             }
           />

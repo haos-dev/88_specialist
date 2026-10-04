@@ -51,7 +51,7 @@ import {
 
 const OGGI = toDataISO(oggi());
 const OWNER = SESSIONE_SEED.userId;
-const clienti: Cliente[] = CLIENTI_SEED.map((c) => ({ ...c }));
+const clienti: Cliente[] = CLIENTI_SEED.map((c) => ({ ...c, training_days: c.training_days ?? null, training_until: c.training_until ?? null }));
 const esercizi: Esercizio[] = ESERCIZI_SEED.map((e) => ({ ...e }));
 const schede: Scheda[] = SCHEDE_SEED.map((s) => ({ ...s }));
 const giorni: Giorno[] = GIORNI_SEED.map((g) => ({ ...g }));
@@ -150,6 +150,12 @@ const appuntamentiFixtures: AppuntamentiApi = {
     };
     appuntamenti.push(nuovo);
     return attesa({ ...nuovo });
+  },
+  async aggiorna(id, input) {
+    const appuntamento = appuntamenti.find((a) => a.id === id);
+    if (!appuntamento) throw new ErroreDati("sconosciuto", "Questo appuntamento non esiste più.");
+    Object.assign(appuntamento, input, { updated_at: ora() });
+    return attesa({ ...appuntamento });
   },
   async elimina(id) {
     const indice = appuntamenti.findIndex(
@@ -270,6 +276,8 @@ const clientiFixtures: ClientiApi = {
       id: uid("cl"),
       owner_id: SESSIONE_SEED.userId,
       ...input,
+      training_days: null,
+      training_until: null,
       active: true,
       created_at: ora(),
       updated_at: ora(),
@@ -295,6 +303,20 @@ const clientiFixtures: ClientiApi = {
       throw new ErroreDati("sconosciuto", "Questo cliente non esiste più.");
     Object.assign(cliente, input, { updated_at: ora() });
     return attesa({ ...cliente });
+  },
+
+  async aggiornaPreferenzeAllenamento(id, preferenze) {
+    const cliente = clienti.find((c) => c.id === id);
+    if (!cliente) throw new ErroreDati("sconosciuto", "Questo cliente non esiste più.");
+    rimuoviAppuntamenti((a) => a.client_id === id && appuntamentoFuturo(a));
+    cliente.training_days = preferenze.giorni;
+    cliente.training_until = preferenze.fine;
+    cliente.updated_at = ora();
+    appuntamenti.push(...preferenze.lezioni.map((lezione) => ({
+      id: uid("app"), owner_id: SESSIONE_SEED.userId, client_id: id,
+      ...lezione, created_at: ora(), updated_at: ora(),
+    })));
+    await attesa(null);
   },
 
   async impostaAttivo(id, attivo) {

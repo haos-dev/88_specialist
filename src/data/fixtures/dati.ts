@@ -265,6 +265,8 @@ function cliente(
     weight_kg: null,
     goal: null,
     notes: null,
+    training_days: null,
+    training_until: null,
     active: true,
     created_at: `${OGGI}T09:00:00Z`,
     updated_at: `${OGGI}T09:00:00Z`,

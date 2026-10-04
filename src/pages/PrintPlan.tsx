@@ -186,7 +186,7 @@ export default function PrintPlan() {
                             <p className="text-sm font-medium text-ink">
                               {riga.esercizio.name}
                             </p>
-                            {riga.notes && (
+                            {riga.notes?.trim() && (
                               <p className="mt-0.5 text-xs text-muted">
                                 {riga.notes}
                               </p>

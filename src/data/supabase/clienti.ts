@@ -7,7 +7,7 @@ import type { ClientiApi } from '../types'
 type ConConteggio = { workout_plans: { count: number }[] | null }
 
 const CAMPI =
-  'id, owner_id, first_name, last_name, email, phone, birth_date, height_cm, weight_kg, goal, notes, active, created_at, updated_at'
+  'id, owner_id, first_name, last_name, email, phone, birth_date, height_cm, weight_kg, goal, notes, training_days, training_until, active, created_at, updated_at'
 
 export const clientiSupabase: ClientiApi = {
   async elenco(filtro) {
@@ -75,6 +75,16 @@ export const clientiSupabase: ClientiApi = {
       .single()
     if (error) throw traduciErrore(error, 'salvare il cliente')
     return data as Cliente
+  },
+
+  async aggiornaPreferenzeAllenamento(id, preferenze) {
+    const { error } = await supabase().rpc("sostituisci_lezioni_cliente", {
+      p_client_id: id,
+      p_lezioni: preferenze.lezioni,
+      p_training_days: preferenze.giorni,
+      p_training_until: preferenze.fine,
+    });
+    if (error) throw traduciErrore(error, "aggiornare le preferenze di allenamento");
   },
 
   async impostaAttivo(id, attivo) {

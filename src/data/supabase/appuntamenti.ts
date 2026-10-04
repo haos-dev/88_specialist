@@ -32,6 +32,16 @@ export const appuntamentiSupabase: AppuntamentiApi = {
     if (error) throw traduciErrore(error, "creare l'appuntamento");
     return data as Appuntamento;
   },
+  async aggiorna(id, input) {
+    const { data, error } = await supabase()
+      .from("appointments")
+      .update(input)
+      .eq("id", id)
+      .select(CAMPI)
+      .single();
+    if (error) throw traduciErrore(error, "modificare l'appuntamento");
+    return data as Appuntamento;
+  },
   async elimina(id) {
     const { error } = await supabase()
       .from("appointments")

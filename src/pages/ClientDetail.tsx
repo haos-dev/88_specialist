@@ -21,8 +21,10 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Caricamento, Errore, Vuoto } from "@/components/ui/Stato";
 import { useToast } from "@/components/ui/Toast";
 import { ClientForm } from "@/features/clients/ClientForm";
+import { TrainingPreferencesDialog } from "@/features/clients/TrainingPreferencesDialog";
 import {
   useAggiornaCliente,
+  useAggiornaPreferenzeAllenamento,
   useArchiviaCliente,
   useCliente,
   useEliminaCliente,
@@ -39,10 +41,12 @@ export default function ClientDetail() {
   const cliente = useCliente(id);
   const schede = useSchedeCliente(id);
   const aggiorna = useAggiornaCliente();
+  const aggiornaPreferenze = useAggiornaPreferenzeAllenamento();
   const archivia = useArchiviaCliente();
   const elimina = useEliminaCliente();
   const creaScheda = useCreaScheda();
   const [formCliente, setFormCliente] = useState(false);
+  const [formPreferenze, setFormPreferenze] = useState(false);
   const [formScheda, setFormScheda] = useState(false);
   const [confermaEliminazione, setConfermaEliminazione] = useState(false);
   const [confermaArchiviazione, setConfermaArchiviazione] = useState(false);
@@ -215,6 +219,14 @@ export default function ClientDetail() {
           <div className="mt-6 flex items-center gap-2 border-t border-line pt-5">
             <div className="ml-auto flex items-center gap-2">
               <Button
+                aria-label="Preferenze di allenamento"
+                title="Preferenze di allenamento"
+                className="h-10 w-10 !p-0"
+                onClick={() => setFormPreferenze(true)}
+              >
+                <CalendarDays aria-hidden="true" size={17} />
+              </Button>
+              <Button
                 aria-label="Modifica cliente"
                 title="Modifica cliente"
                 className="h-10 w-10 !p-0"
@@ -342,6 +354,23 @@ export default function ClientDetail() {
             },
           )
         }
+      />
+      <TrainingPreferencesDialog
+        key={formPreferenze ? `aperto-${c.id}` : `chiuso-${c.id}`}
+        cliente={c}
+        aperto={formPreferenze}
+        inCorso={aggiornaPreferenze.isPending}
+        onChiudi={() => setFormPreferenze(false)}
+        onSalva={(preferenze) => aggiornaPreferenze.mutate(
+          { id: c.id, preferenze },
+          {
+            onSuccess: () => {
+              setFormPreferenze(false);
+              toast.conferma("Preferenze salvate e appuntamenti futuri aggiornati.");
+            },
+            onError: (errore) => toast.errore(messaggioErrore(errore)),
+          },
+        )}
       />
       <PlanForm
         aperto={formScheda}

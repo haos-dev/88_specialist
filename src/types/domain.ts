@@ -52,6 +52,14 @@ export interface AppuntamentoInput {
   notes: string | null;
 }
 
+export type AppuntamentoAggiornamento = AppuntamentoInput;
+
+export interface PreferenzeAllenamentoInput {
+  lezioni: LezioneInput[];
+  giorni: { giorno: number; ora: string }[] | null;
+  fine: string | null;
+}
+
 /**
  * Lezione generata alla creazione di un cliente: un appuntamento il cui
  * `client_id` è quello del cliente appena creato, e quindi non esiste ancora.

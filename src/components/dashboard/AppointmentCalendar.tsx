@@ -20,12 +20,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { messaggioErrore } from "@/data";
 import { useClienti } from "@/features/clients/useClients";
 import {
   useAppuntamenti,
   useCreaAppuntamento,
+  useAggiornaAppuntamento,
   useEliminaAppuntamento,
 } from "@/features/appointments/useAppointments";
 import { oggi, parseDataISO, toDataISO } from "@/lib/dates";
@@ -62,6 +64,7 @@ export function AppointmentCalendar() {
   // Cambia a ogni apertura: rimonta il dialog, che riparte con i campi vuoti.
   const [aperture, setAperture] = useState(0);
   const [daEliminare, setDaEliminare] = useState<Appuntamento | null>(null);
+  const [daModificare, setDaModificare] = useState<Appuntamento | null>(null);
   const toast = useToast();
   const meseCorrente = meseISO(mese);
   const appuntamenti = useAppuntamenti(meseCorrente);
@@ -69,10 +72,17 @@ export function AppointmentCalendar() {
   // archiviato restano in calendario e devono ancora mostrarne il nome.
   const clienti = useClienti({ stato: "tutti" });
   const clientiAttivi = (clienti.data ?? []).filter((c) => c.active);
+  const clienteEventoModificato = daModificare?.client_id
+    ? (clienti.data ?? []).find((c) => c.id === daModificare.client_id)
+    : undefined;
+  const clientiDialog = clienteEventoModificato && !clienteEventoModificato.active
+    ? [...clientiAttivi, clienteEventoModificato]
+    : clientiAttivi;
   const nomiClienti = new Map(
     (clienti.data ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`]),
   );
   const crea = useCreaAppuntamento();
+  const aggiorna = useAggiornaAppuntamento();
   const elimina = useEliminaAppuntamento();
   const giorni = eachDayOfInterval({
     start: startOfWeek(startOfMonth(mese), { weekStartsOn: 1 }),
@@ -96,6 +106,19 @@ export function AppointmentCalendar() {
   };
 
   const salva = (input: AppuntamentoInput) => {
+    if (daModificare) {
+      aggiorna.mutate({ id: daModificare.id, input }, {
+        onSuccess: (evento) => {
+          const data = parseDataISO(evento.appointment_date) ?? oggi();
+          setMese(startOfMonth(data));
+          setGiornoSelezionato(data);
+          setDaModificare(null);
+          toast.conferma("Appuntamento modificato.");
+        },
+        onError: (errore) => toast.errore(messaggioErrore(errore)),
+      });
+      return;
+    }
     crea.mutate(input, {
       onSuccess: () => {
         setDialogAperto(false);
@@ -278,15 +301,26 @@ export function AppointmentCalendar() {
                       </p>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    aria-label={`Elimina ${evento.title}`}
-                    title="Elimina appuntamento"
-                    onClick={() => setDaEliminare(evento)}
-                    className="text-muted hover:text-scaduta"
-                  >
-                    <Trash2 aria-hidden="true" size={15} />
-                  </button>
+                  <div className="flex shrink-0 flex-col items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label={`Elimina ${evento.title}`}
+                      title="Elimina appuntamento"
+                      onClick={() => setDaEliminare(evento)}
+                      className="text-muted hover:text-scaduta"
+                    >
+                      <Trash2 aria-hidden="true" size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Modifica ${evento.title}`}
+                      title="Modifica appuntamento"
+                      onClick={() => setDaModificare(evento)}
+                      className="text-muted hover:text-accent"
+                    >
+                      <Pencil aria-hidden="true" size={15} />
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}
@@ -295,12 +329,13 @@ export function AppointmentCalendar() {
       </div>
 
       <AppointmentDialog
-        key={aperture}
-        aperto={dialogAperto}
+        key={daModificare?.id ?? `nuovo-${aperture}`}
+        aperto={dialogAperto || daModificare !== null}
+        appuntamento={daModificare}
         giorno={giornoSelezionato}
-        clienti={clientiAttivi}
-        inCorso={crea.isPending}
-        onChiudi={() => setDialogAperto(false)}
+        clienti={clientiDialog}
+        inCorso={crea.isPending || aggiorna.isPending}
+        onChiudi={() => { setDialogAperto(false); setDaModificare(null); }}
         onSalva={salva}
       />
       <ConfirmDialog
@@ -323,6 +358,7 @@ export function AppointmentCalendar() {
 
 function AppointmentDialog({
   aperto,
+  appuntamento,
   giorno,
   clienti,
   inCorso,
@@ -330,23 +366,25 @@ function AppointmentDialog({
   onSalva,
 }: {
   aperto: boolean;
+  appuntamento: Appuntamento | null;
   giorno: Date;
   clienti: Array<{ id: string; first_name: string; last_name: string }>;
   inCorso: boolean;
   onChiudi: () => void;
   onSalva: (input: AppuntamentoInput) => void;
 }) {
-  const [titolo, setTitolo] = useState("");
-  const [ora, setOra] = useState("09:00");
-  const [durata, setDurata] = useState("60");
-  const [cliente, setCliente] = useState("");
-  const [note, setNote] = useState("");
+  const [titolo, setTitolo] = useState(appuntamento?.title ?? "");
+  const [data, setData] = useState(appuntamento?.appointment_date ?? toDataISO(giorno));
+  const [ora, setOra] = useState(appuntamento?.start_time.slice(0, 5) ?? "09:00");
+  const [durata, setDurata] = useState(String(appuntamento?.duration_minutes ?? 60));
+  const [cliente, setCliente] = useState(appuntamento?.client_id ?? "");
+  const [note, setNote] = useState(appuntamento?.notes ?? "");
 
   return (
     <Dialog
       aperto={aperto}
-      titolo="Nuovo appuntamento"
-      descrizione={format(giorno, "EEEE d MMMM yyyy", { locale: it })}
+      titolo={appuntamento ? "Modifica appuntamento" : "Nuovo appuntamento"}
+      descrizione={appuntamento ? "Aggiorna i dettagli dell'appuntamento." : format(giorno, "EEEE d MMMM yyyy", { locale: it })}
       onChiudi={onChiudi}
       azioni={
         <>
@@ -359,7 +397,7 @@ function AppointmentDialog({
               onSalva({
                 client_id: cliente || null,
                 title: titolo.trim() || "Appuntamento",
-                appointment_date: toDataISO(giorno),
+                appointment_date: data,
                 start_time: `${ora}:00`,
                 duration_minutes: Number(durata),
                 notes: note.trim() || null,
@@ -367,7 +405,7 @@ function AppointmentDialog({
             }
             disabled={inCorso || !titolo.trim()}
           >
-            Salva appuntamento
+            {appuntamento ? "Salva modifiche" : "Salva appuntamento"}
           </Button>
         </>
       }
@@ -385,6 +423,9 @@ function AppointmentDialog({
           )}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Data">
+            {(props) => <Input {...props} type="date" value={data} onChange={(e) => setData(e.target.value)} />}
+          </Field>
           <Field label="Orario">
             {(props) => (
               <Input

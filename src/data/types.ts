@@ -1,6 +1,7 @@
 import type {
   Appuntamento,
   AppuntamentoInput,
+  AppuntamentoAggiornamento,
   Cliente,
   ClienteConSchede,
   ClienteInput,
@@ -8,6 +9,7 @@ import type {
   EsercizioInput,
   GiornoEsercizioInput,
   LezioneInput,
+  PreferenzeAllenamentoInput,
   Impostazioni,
   Riordino,
   Scheda,
@@ -49,6 +51,7 @@ export interface DashboardApi {
 export interface AppuntamentiApi {
   elenco(mese: string): Promise<Appuntamento[]>;
   crea(input: AppuntamentoInput): Promise<Appuntamento>;
+  aggiorna(id: string, input: AppuntamentoAggiornamento): Promise<Appuntamento>;
   elimina(id: string): Promise<void>;
 }
 
@@ -68,6 +71,7 @@ export interface ClientiApi {
    */
   crea(input: ClienteInput, lezioni?: LezioneInput[]): Promise<Cliente>;
   aggiorna(id: string, input: ClienteInput): Promise<Cliente>;
+  aggiornaPreferenzeAllenamento(id: string, preferenze: PreferenzeAllenamentoInput): Promise<void>;
   /**
    * Archivia (false) o riattiva (true). Archiviando, gli appuntamenti futuri
    * del cliente escono dal calendario (0009); riattivando non tornano.

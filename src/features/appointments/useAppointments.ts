@@ -33,3 +33,13 @@ export function useEliminaAppuntamento() {
       client.invalidateQueries({ queryKey: chiavi.appuntamenti.tutti }),
   });
 }
+
+export function useAggiornaAppuntamento() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: AppuntamentoInput }) =>
+      dati.appuntamenti.aggiorna(id, input),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: chiavi.appuntamenti.tutti }),
+  });
+}
